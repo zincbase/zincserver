@@ -53,7 +53,7 @@ The editor is a web-based application that can view and edit any ZincDB datastor
 5. Open a web browser at `http://localhost:8888/editor`.
 6. Once the editor opens, fill the global configuration datastore URI (`http://localhost:[ZincServerPort]/datastore/.config`) and master key as access key and press enter.
 
-### Setting up access keys
+## Setting up access keys
 
 ZincServer's access control is based on _access keys_, which must be 32 character lowercase hexadecimal strings. An access key is associated with an _access profile_ that describes what permissions and limits are allowed for that key. A single access profile can be shared across multiple access keys.
 

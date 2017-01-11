@@ -1,8 +1,6 @@
 # Getting started guide
 
-## Setting up a server
-
-### Building the server
+## Building the server
 
 Install [Go](https://golang.org/dl/).
 
@@ -16,7 +14,7 @@ A `zincserver.exe` (Windows) or `zincserver` (Linux) executable should be create
 
 (pre-compiled binaries may become available in the future as well)
 
-### Launching the server
+## Launching the server
 
 Starting an insecure (HTTP) listener on port `8000` with `"./datastores"` as a storage directory:
 
@@ -34,17 +32,17 @@ _(note it is possible to run both an HTTP and an HTTPS listener concurrently)_
 
 Run `zincserver start -help` for more startup options.
 
-### Initializing global configuration and getting a master key.
+## Initializing global configuration and getting a master key.
 
 When the server is launched, it creates a special `.config` datastore at the specified storage path, if one doesn't exist already. The global configuration datastore is initialized with a boilerplate default configuration and a securely generated master key, which is printed to the console. The master key grants full access to all datastores and is the only access key permitted to view or modify the global configuration datastore.
 
-### Configuring the server
+## Configuring the server
 
 ZincServer allows two levels of configuration. Global and datastore-specific. Global configuration is stored at the `.config` datastore, and datastore-specific settings can be specified in a datastore named `<DatastoreName>.config`. Datastore-specific configuration inherits from the global one and would override any existing global setting when a value with identical key is set.
 
 ZincServer configuration is fully live and can be freely modified while the server is running and data is read or written to it, with changes taking effect immediately and no need for any restarts. The web-based editor tool can be used to conveniently create and manage datastores, and datastore configurations, set up access keys and profiles.
 
-### Setting up the editor
+## Setting up the editor
 
 The editor is a web-based application that can view and edit any ZincDB datastore, including ZincServer configuration datastores.
 
@@ -67,6 +65,6 @@ The default configuration contains two boilerplate access profiles: `Reader` and
 
 and give it the value `"Reader"` (note the string used in the path is the hex encoded SHA1 hash of the the target access key as plain string).
 
-### Modifying and creating access profiles, configuring limits, quotas and misc settings
+## Modifying and creating access profiles, configuring limits, quotas and misc settings
 
 Please continue to the [configuration reference](https://github.com/zincbase/zincserver/blob/master/docs/Configuration%20reference.md) for more details.

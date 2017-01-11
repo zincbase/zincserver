@@ -1,6 +1,6 @@
-## ZincServer REST API Reference
+# ZincServer REST API Reference
 
-### `GET`
+## `GET`
 
 Read the content of a datastore.
 
@@ -26,7 +26,7 @@ The requested data, contained in the response body. Either in the native binary 
 
 In string formatted responses: if the result set contains an revision with a binary or encrypted key or value, it would be encoded as a BASE64 JSON string. A UTF-8 typed key or value would be encoded as a JSON string as well. Since there would be no way to discriminate between different encodings, the client would need to have pre-programmed knowledge that these particular keys are associated with non-JSON content, there is currently no additional type metadata given when using string formatted requests. 
 
-### `GET` (WebSocket upgrade)
+## `GET` (WebSocket upgrade)
 
 Create a WebSocket to both fetch existing data, and receive real-time updates for future modifications of the datastore.
 
@@ -44,7 +44,7 @@ Similar to regular `GET`. `waitUntilNonempty` argument is not applicable and wou
 
 Opens a WebSocket. The WebSocket is unidirectional and would send a stream of messages similar in form to GET response bodies. The messages would include both past and future revisions that match the given query.
 
-### `POST`
+## `POST`
 
 Commit new revisions to the datastore.
 
@@ -87,11 +87,11 @@ See the appendix section below for a detailed description of the `tabbedJsonShor
 
 If the `tabbedJson` formatting is used, The timestamps included in the transmitted revisions, are taken as update timestamps. If `tabbedJsonShort` is used, the update timestamps are set by the server and are identical to the commit timestamps.
 
-### `PUT`
+## `PUT`
 
 Similar to `POST`, only all datastore content is cleared before new data is written to it.
 
-### `DELETE`
+## `DELETE`
 
 Destroys the entire datastore. All data is permanently deleted.
 

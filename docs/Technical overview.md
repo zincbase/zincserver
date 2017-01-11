@@ -1,4 +1,4 @@
-## Technical overview
+# Technical overview
 
 ZincServer is a _chronological keyed datastore_. It is a time-based, key-aware storage engine only capable of only a few rudimentary operations:
 
@@ -31,13 +31,13 @@ When a datastore is first referenced in a request, it is loaded (as well as its 
 
 Note: in order to 'delete' a particular key, a revision with that key is added with a zero-length value. This revision is still stored in the datastore and kept throughout compactions. In order to permanently delete a key, either the database needs to be rewritten or a compaction should be run with a special 'purge' flag (not currently implemented) that would permanently remove any revisions with no values.
 
-### Managing concurrency between readers, writers and compactions
+## Managing concurrency between readers, writers and compactions
 
 The server serializes write and compaction operations, however, read operations can happen concurrently, including concurrently to writes, rewrites and compactions. This is achieved by guarantying all file updates to be non-destructive in nature, and releasing old resources only when they are not needed:
 
 * Read operations are bounded by a predetermined range within the file at the time of the request, so partially written data is never encountered by the reader.
 * Compactions and Rewrites always create new files, and through a series of careful rename and delete operations, allow for the old file to still remain accessible to existing readers, but the new file to be visible for newer readers and writers. Once all existing readers of an old file have finished, the old file is immediately released from the file system and deleted. This may happen for several generations concurrently.
 
-### An eye to the future: scaling to multiple machines
+## An eye to the future: scaling to multiple machines
 
 The datastore already provides very high performance on a single machine, and scales well in multi-core hardware. Scaling to multiple machines, most likely using master-replicator configuration, is currently under investigation and has been taken into account during the design process.

@@ -8,7 +8,7 @@ Configuration entry keys are node paths of the form `["<identifier>", "<identifi
 
 There are two layers of configuration: Global configuration, contained in the `.config` datastore, and particular, contained in `<datastoreName>.config` datastore, which can be created for any datastore except the configuration datastores themselves. Both datastore-specific and global settings can be combined, where the datastore-specific settings always take precedence and the global setting is used if the corresponding key is not specified .
 
-_The actual underlying raw encoding is a JSON string of the form `"['<identifier>']['<identifier>']['<identifier>']...".` The array-like format used here is similar to the one shown by the editor and used in the ZincDB Javascript API._
+_The actual underlying raw encoding is a JSON string of the form `"['<identifier>']['<identifier>']['<identifier>']...".` The array-like format used here is similar to the one shown by the editor and used in the ZincDB JavaScript API._
 
 ## Global settings
 

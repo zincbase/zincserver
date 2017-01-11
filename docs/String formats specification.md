@@ -1,6 +1,6 @@
 # String formats specification
 
-### `"jsonObject"`
+## `"jsonObject"`
 
 A standard JSON object of the form:
 
@@ -15,7 +15,7 @@ A standard JSON object of the form:
 
 Note that it may contain duplicate keys. Make sure the JSON parser you're using supports them and automatically resolves them to the latest value. Also note this format doesn't include any timestamp and thus is not suitable for synchronization.
 
-### `"jsonArray"`
+## `"jsonArray"`
 
 A standard JSON array of the form:
 
@@ -30,7 +30,7 @@ A standard JSON array of the form:
 
 If received from the server, the `timestamp` property would represent the entry commit time.
 
-### `"jsonStream"`:
+## `"jsonStream"`:
 
 A non JSON-compliant stream of individual JSON objects, separated by line feeds:
 
@@ -41,7 +41,7 @@ A non JSON-compliant stream of individual JSON objects, separated by line feeds:
 ...
 ``` 
 
-### `"tabbedJson"`
+## `"tabbedJson"`
 
 A tab and line-feed delimited sequence of JSON values. Property keys are pre-defined and values are separated by tabs (`\t`). Individual entries are separated by single line feed (`\n`) characters:
 
@@ -52,7 +52,7 @@ A tab and line-feed delimited sequence of JSON values. Property keys are pre-def
 ...
 ```
 
-### `"tabbedJsonShort"`
+## `"tabbedJsonShort"`
 
 Same as `"tabbedJson"`, only timestamps are omitted. Intended mostly for testing basic POST and PUT requests.
 
@@ -63,7 +63,7 @@ Same as `"tabbedJson"`, only timestamps are omitted. Intended mostly for testing
 ...
 ``` 
 
-### Some notes about the usage of these formattings
+## Some notes about the usage of these formattings
 
 In `GET` requests, due to the overhead of conversion, using any formatting other then the raw binary one would result in a reduction of performance of about 50%-75%. It should mostly be used for local deployments or when performance is not critical.
 

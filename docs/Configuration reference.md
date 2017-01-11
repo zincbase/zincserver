@@ -1,4 +1,4 @@
-## ZincServer configuration reference
+# ZincServer configuration reference
 
 ZincServer's configuration is contained in a regular datastore, which is automatically created when the server is first run and stored within the file `<storagePath>/@config`. It can be viewed and edited like any other datastore. Any changes made to it would take effect immediately with no server restart needed. 
 
@@ -8,9 +8,9 @@ Configuration entry keys are node paths of the form `["<identifier>", "<identifi
 
 There are two layers of configuration: Global configuration, contained in the `.config` datastore, and particular, contained in `<datastoreName>.config` datastore, which can be created for any datastore except the configuration datastores themselves. Both datastore-specific and global settings can be combined, where the datastore-specific settings always take precedence and the global setting is used if the corresponding key is not specified .
 
-_* The actual underlying raw encoding is a JSON string of the form `"['<identifier>']['<identifier>']['<identifier>']...". The array-like format used here is similar to the one shown by the editor and used in the ZincDB Javascript API.`_
+_The actual underlying raw encoding is a JSON string of the form `"['<identifier>']['<identifier>']['<identifier>']...".` The array-like format used here is similar to the one shown by the editor and used in the ZincDB Javascript API._
 
-### Global settings
+## Global settings
 
 Global settings affect the entire server instance:
 
@@ -18,7 +18,7 @@ Global settings affect the entire server instance:
 * `["server","http","loopbackOnly"]` (boolean): Only accept clients originating in localhost (loopback) for HTTP connections.
 * `["server","https","loopbackOnly"]` (boolean): Only accept clients originating in localhost (loopback) for HTTPS connections.
 
-### Access profile definitions
+## Access profile definitions
 
 Access profiles are sets of configuration entries that specify permissions and quotas to any access key that is set to point to them. Every HTTP method (e.g. `GET`, `POST`, `PUT` etc.) is configured separately.
 
@@ -27,7 +27,7 @@ Access profiles are sets of configuration entries that specify permissions and q
 * `["accessProfile",<AccessProfileName>,"method",<"GET" | "PUT" | "POST" | "DELETE"| "WebSocket">,"limit","requests","interval"]` (integer): Interval (milliseconds) for corresponding maximum requests limit.
 * `["accessProfile",<AccessProfileName>,"method",<"GET" | "PUT" | "POST" | "DELETE"| "WebSocket">,"param",<ParamName>,"allowed"]` (boolean): Allow or disallow the HTTP request parameter specified in the path (`<ParamName>`). By default all parameters except `auth` are disallowed for all methods unless explicitly enabled.
 
-### Datastore settings
+## Datastore settings
 
 Datastore settings are settings applied to each datastore (or globally to all datastores if specified in `.config`).
 

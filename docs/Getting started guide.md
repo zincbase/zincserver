@@ -1,10 +1,10 @@
 # Getting started guide
 
-### Setting up a server
+## Setting up a server
 
-#### Building the server
+### Building the server
 
-Install go: [https://golang.org/dl/](https://golang.org/dl/)
+Install [Go](https://golang.org/dl/).
 
 Once `GOPATH` is correctly configured, run:
 
@@ -16,7 +16,7 @@ A `zincserver.exe` (Windows) or `zincserver` (Linux) executable should be create
 
 (pre-compiled binaries may become available in the future as well)
 
-#### Launching the server
+### Launching the server
 
 Starting an insecure (HTTP) listener on port `8000` with `"./datastores"` as a storage directory:
 
@@ -34,11 +34,11 @@ _(note it is possible to run both an HTTP and an HTTPS listener concurrently)_
 
 Run `zincserver start -help` for more startup options.
 
-#### Initializing global configuration and getting a master key.
+### Initializing global configuration and getting a master key.
 
 When the server is launched, it creates a special `.config` datastore at the specified storage path, if one doesn't exist already. The global configuration datastore is initialized with a boilerplate default configuration and a securely generated master key, which is printed to the console. The master key grants full access to all datastores and is the only access key permitted to view or modify the global configuration datastore.
 
-#### Configuring the server
+### Configuring the server
 
 ZincServer allows two levels of configuration. Global and datastore-specific. Global configuration is stored at the `.config` datastore, and datastore-specific settings can be specified in a datastore named `<DatastoreName>.config`. Datastore-specific configuration inherits from the global one and would override any existing global setting when a value with identical key is set.
 
@@ -55,7 +55,7 @@ The editor is a web-based application that can view and edit any ZincDB datastor
 5. Open a web browser at `http://localhost:8888/editor`.
 6. Once the editor opens, fill the global configuration datastore URI (`http://localhost:[ZincServerPort]/datastore/.config`) and master key as access key and press enter.
 
-#### Setting up access keys
+### Setting up access keys
 
 ZincServer's access control is based on _access keys_, which must be 32 character lowercase hexadecimal strings. An access key is associated with an _access profile_ that describes what permissions and limits are allowed for that key. A single access profile can be shared across multiple access keys.
 
@@ -67,6 +67,6 @@ The default configuration contains two boilerplate access profiles: `Reader` and
 
 and give it the value `"Reader"` (note the string used in the path is the hex encoded SHA1 hash of the the target access key as plain string).
 
-#### Modifying and creating access profiles, configuring limits, quotas and misc settings
+### Modifying and creating access profiles, configuring limits, quotas and misc settings
 
-Please continue to the [configuration reference]() for more details.
+Please continue to the [configuration reference](https://github.com/zincbase/zincserver/blob/master/docs/Configuration%20reference.md) for more details.

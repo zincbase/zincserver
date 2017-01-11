@@ -12,13 +12,13 @@ Currently only tested on Linux and Windows. Might build on other platforms as we
 
 ### Documentation
 
-* [Getting started guide]()
-* [REST API reference]()
-* [Configuration reference]()
-* [Technical overview]()
-* [Binary format specification]()
-* [String formats specification]()
+* [Getting started guide](https://github.com/zincbase/zincserver/blob/master/docs/Getting%20started%20guide.md)
+* [REST API reference](https://github.com/zincbase/zincserver/blob/master/docs/REST%20API%20reference.md)
+* [Configuration reference](https://github.com/zincbase/zincserver/blob/master/docs/Configuration%20reference.md)
+* [Technical overview](https://github.com/zincbase/zincserver/blob/master/docs/Technical%20overview.md)
+* [Binary format specification](https://github.com/zincbase/zincserver/blob/master/docs/Binary%20format%20specification.md)
+* [String formats specification](https://github.com/zincbase/zincserver/blob/master/docs/String%20formats%20specification.md)
 
 ### License
 
-MIT
+[MIT](https://github.com/zincbase/zincserver/blob/master/LICENSE)

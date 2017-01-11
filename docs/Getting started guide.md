@@ -47,7 +47,7 @@ ZincServer configuration is fully live and can be freely modified while the serv
 The editor is a web-based application that can view and edit any ZincDB datastore, including ZincServer configuration datastores.
 
 1. Make sure you have the latest [Node.js](https://nodejs.org/en/) installed.
-2. Download the ZincDB repository at `https://github.com/zincbase/zincdb` by selecting `Clone or Download` -> `Download ZIP` at the main repository page (or alternatively clone the repository by running `git clone https://github.com/zincbase/zincdb.git`).
+2. Download the [ZincDB repository](https://github.com/zincbase/zincdb) by selecting `Clone or Download` -> `Download ZIP` at the main repository page (or alternatively clone the repository by running `git clone https://github.com/zincbase/zincdb.git`).
 3. Unzip if needed.
 4. Run `npm install`, `npm run build`, `npm run devserver` at the repository's root directory.
 5. Open a web browser at `http://localhost:8888/editor`.

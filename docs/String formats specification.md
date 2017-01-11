@@ -4,7 +4,7 @@
 
 A standard JSON object of the form:
 
-```json
+```js
 {
 	"key1": "value1",
 	"key2": "value2",
@@ -19,7 +19,7 @@ Note that it may contain duplicate keys. Make sure the JSON parser you're using 
 
 A standard JSON array of the form:
 
-```json
+```js
 [
 	{"timestamp": 1464852127534534, "key": "key1", "value": "value1"},
 	{"timestamp": 1464852127534564, "key": "key1", "value": "value2"},
@@ -30,11 +30,11 @@ A standard JSON array of the form:
 
 If received from the server, the `timestamp` property would represent the entry commit time.
 
-## `"jsonStream"`:
+## `"jsonStream"`
 
 A non JSON-compliant stream of individual JSON objects, separated by line feeds:
 
-```json
+```js
 {"timestamp": 1464852127534534, "key": "key1", "value": "value1"}\n
 {"timestamp": 1464852127534564, "key": "key1", "value": "value2"}\n
 {"timestamp": 1464852127534576, "key": "key1", "value": "value3"}\n
@@ -45,7 +45,7 @@ A non JSON-compliant stream of individual JSON objects, separated by line feeds:
 
 A tab and line-feed delimited sequence of JSON values. Property keys are pre-defined and values are separated by tabs (`\t`). Individual entries are separated by single line feed (`\n`) characters:
 
-```json
+```js
 1464852127534534\t"key1"\t"value1"\n
 1464852127534564\t"key2"\t"value2"\n
 1464852127534564\t"key3"\t"value3"\n
@@ -56,7 +56,7 @@ A tab and line-feed delimited sequence of JSON values. Property keys are pre-def
 
 Same as `"tabbedJson"`, only timestamps are omitted. Intended mostly for testing basic POST and PUT requests.
 
-```json
+```js
 "key1"\t"value1"\n
 "key2"\t"value2"\n
 "key3"\t"value3"\n

@@ -98,7 +98,7 @@ func parseStartCommand(args []string) {
 |   There might be bugs or security vulnerabilities.    |
 |                                                       |
 |   Please report issues at:                            |
-|   https://github.com/rotemdan/zincserver/issues       |
+|   https://github.com/zincbase/zincserver/issues       |
 ---------------------------------------------------------`)
 
 	server := NewServer(commandOptions)

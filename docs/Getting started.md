@@ -2,12 +2,12 @@
 
 ## Building the server
 
-Install [Go](https://golang.org/dl/).
+Make sure [Git](https://git-scm.com/downloads) and [Go](https://golang.org/dl/) are installed.
 
 Once `GOPATH` is correctly configured, run:
 
 ```
-go get -u -v https://github.com/zincbase/zincserver
+go get -u -v github.com/zincbase/zincserver
 ```
 
 A `zincserver.exe` (Windows) or `zincserver` (Linux) executable should be created in your `$GOPATH/bin` directory.

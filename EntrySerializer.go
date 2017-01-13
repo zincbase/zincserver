@@ -152,6 +152,9 @@ func DeserializeEntryStreamReaderAndAppendToVarMap(source io.ReaderAt, startOffs
 // Validation
 ////////////////////////////////////////////////////////////////////////////////
 func ValidateAndPrepareTransaction(entryStream []byte, newTimestamp int64) error {
+	const minAllowedTimestamp int64 = 1483221600 * 1000000
+	maxAllowedTimestamp := MonoUnixTimeMicro() + (30 * 1000000)
+
 	next := NewEntryStreamIterator(bytes.NewReader(entryStream), 0, int64(len(entryStream)), false)
 
 	for {
@@ -166,11 +169,19 @@ func ValidateAndPrepareTransaction(entryStream []byte, newTimestamp int64) error
 		}
 
 		if iteratorResult.PrimaryHeader.KeySize == 0 {
-			return errors.New("Zero length keys are not permitted in transaction entries")
+			return errors.New("Encountered an entry with a zero length key, which is not permitted in transaction entries.")
 		}
 
 		if iteratorResult.PrimaryHeader.Flags > 1 {
-			return errors.New("No flags other than 'TransactionEnd' (1) are permitted in transaction entries")
+			return errors.New("Encountered an entry header containing a flag that is not 'TransactionEnd' (1).")
+		}
+
+		if iteratorResult.PrimaryHeader.UpdateTime < minAllowedTimestamp {
+			return errors.New("Encountered an entry header containing an update time smaller than 1483221600 * 1000000 (Januaray 1st 2017, 00:00).")
+		}		
+
+		if iteratorResult.PrimaryHeader.UpdateTime > maxAllowedTimestamp {
+			return errors.New("Encountered an entry header containing an update time greater than 30 seconds past the server's clock.")
 		}
 
 		if newTimestamp > 0 {

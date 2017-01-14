@@ -23,7 +23,7 @@ When a datastore is first referenced in a request, it is loaded (as well as its 
 
 1. To serve a `GET` request, the index is searched using linear/binary search and the offset of the earliest matching revision is found. The file is then read as-is, directly from disk, starting at the resulting offset and streamed to the response in binary, or incrementally converted into a target string format (`?format=...`). Note that this data may contain some amount of duplicate revisions (depending on the frequency of compactions). These are managed at the receiving client by keeping only the latest revision of a particular key and ignoring earlier ones (an experimental `&compact=true` argument is also available, which would perform the compaction on the server side, but should not be generally used).
 
-2. To serve a 'POST' request, a bulk of raw revision data is sent by the client in the request body. These revisions are processed as a single transaction: scanned and verified, and stamped with a commit timestamp (microsecond resolution), where the last one of them receives a 'transaction end' flag. They are then appended to the datastore file and added to the index. Formatted write requests (`?format=...`), are converted to the binary format before applying the same set of operations.
+2. To serve a 'POST' request, a bulk of raw revision data is sent by the client in the request body. These revisions are processed as a single transaction: scanned and verified, and stamped with a commit timestamp (microsecond resolution), where the last one of them receives a 'transaction end' flag. They are then appended to the datastore file and added to the index.
 
 3. A 'PUT' request is similar to 'POST' only the database is cleared before the new revisions are written.
 

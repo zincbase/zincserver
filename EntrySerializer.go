@@ -38,6 +38,11 @@ const (
 	DataFormat_JSON     uint8 = 2
 )
 
+type JsonEntry struct {
+	key string
+	value string
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Serialization
 ////////////////////////////////////////////////////////////////////////////////
@@ -54,18 +59,19 @@ func SerializeEntries(entries []Entry) []byte {
 func SerializeEntry(entry *Entry) (serializedEntry []byte) {
 	totalSize := int64(PrimaryHeaderSize + len(entry.Key) + len(entry.Value))
 	keySize := uint16(len(entry.Key))
+	timestamp := MonoUnixTimeMicro()
 
 	if entry.PrimaryHeader == nil {
-		timestamp := MonoUnixTimeMicro()
-
 		entry.PrimaryHeader = &EntryPrimaryHeader{
 			TotalSize:  totalSize,
-			CommitTime: timestamp,
 			UpdateTime: timestamp,
 			KeySize:    keySize,
 		}
 	} else {
 		entry.PrimaryHeader.TotalSize = totalSize
+		if entry.PrimaryHeader.UpdateTime == 0 {
+			entry.PrimaryHeader.UpdateTime = timestamp
+		}
 		entry.PrimaryHeader.KeySize = keySize
 	}
 
@@ -81,6 +87,23 @@ func SerializeEntry(entry *Entry) (serializedEntry []byte) {
 
 func WritePrimaryHeader(targetSlice []byte, header *EntryPrimaryHeader) {
 	*(*EntryPrimaryHeader)(unsafe.Pointer(&targetSlice[0])) = *header
+}
+
+func SerializeJsonEntries(jsonEntries []JsonEntry) []byte {
+	entries := []Entry{}
+
+	for _, jsonEntry := range jsonEntries {
+		entries = append(entries, Entry{ 
+			PrimaryHeader: &EntryPrimaryHeader{ 
+				KeyFormat: DataFormat_JSON, 
+				ValueFormat: DataFormat_JSON,
+			}, 
+			Key: []byte(jsonEntry.key), 
+			Value: []byte(jsonEntry.value),
+		})
+	}
+
+	return SerializeEntries(entries)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

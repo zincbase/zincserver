@@ -18,7 +18,7 @@ GET https://mydomain.com/datastore/MyDatastore?updatedAfter=1464852127534534&acc
 
 **Response**:
 
-The requested data, contained in the response body in the native binary format (described in detail in an appendix section below).
+The requested data serialized in the [native binary format](https://github.com/zincbase/zincserver/blob/master/docs/Binary%20format%20specification.md).
 
 ## `GET` (WebSocket upgrade)
 
@@ -51,12 +51,7 @@ Commit new revisions to the datastore.
 ```
 POST https://mydomain.com:1337/datastore/MyDatastore&accessKey=3da541559918a808c2402bba5012f6c6
 ```
-Request body containing a stream of binary revision entries:
-```
-[Header (32 bytes)][Key][Value][Header (32 bytes)][Key][Value][Header (32 bytes)][Key][Value]...
-```
-
-See the appendix section below for a detailed description of the binary format.
+Request body containing a stream of [serialized revision entries](https://github.com/zincbase/zincserver/blob/master/docs/Binary%20format%20specification.md).
 
 **Arguments**:
 
@@ -82,4 +77,4 @@ DELETE https://mydomain.com:1337/datastore/MyDatastore&accessKey=3da541559918a80
 
 **Notes**:
 
-The related configuration datastore `<DatastoreName>.config` is not deleted automatically. A `DELETE` operation needs to be issued to it separately.
+The related configuration datastore `<DatastoreName>.config` is not automatically deleted. A separate `DELETE` operation can to be issued to it, if desired.

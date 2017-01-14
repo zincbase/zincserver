@@ -241,42 +241,19 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 		return
 	}
 
-	responseFormat := query.Get("format")
 	compactResponse := query.Get("compact") == "true"
 
 	var resultReader io.Reader
 
-	switch responseFormat {
-	case "jsonArray", "jsonObject", "jsonStream", "tabbedJson", "tabbedJsonShort":
-		switch responseFormat {
-		case "tabbedJson", "tabbedJsonShort", "jsonStream":
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		default:
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		}
-
-		iteratorFunc, _, err := operations.CreateIterator(updatedAfter, compactResponse)
-		if err != nil {
-			operations.RUnlock()
-			return err
-		}
-
-		resultReader = NewEntryStreamFormatter(iteratorFunc, responseFormat)
-	case "", "raw":
-		w.Header().Set("Content-Type", "application/octet-stream")
-		var readSize int64
-		resultReader, readSize, err = operations.CreateReader(updatedAfter, compactResponse)
-		if err != nil {
-			operations.RUnlock()
-			return err
-		}
-
-		w.Header().Set("Content-Length", strconv.FormatInt(readSize, 10))
-	default:
+	var readSize int64
+	resultReader, readSize, err = operations.CreateReader(updatedAfter, compactResponse)
+	if err != nil {
 		operations.RUnlock()
-		endRequestWithError(w, r, 400, errors.New("Invalid response format requested"))
-		return
+		return err
 	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(readSize, 10))
 
 	bodyShouldBeSent := r.Method == "GET"
 	if bodyShouldBeSent {
@@ -319,8 +296,6 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 		return
 	}
 
-	responseFormat := query.Get("format")
-
 	for {
 		operations.RLock()
 		err = operations.LoadIfNeeded()
@@ -344,39 +319,19 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 		var resultReader io.Reader
 		var messageWriter io.WriteCloser
 
-		switch responseFormat {
-		case "jsonArray", "jsonObject", "jsonStream", "tabbedJson", "tabbedJsonShort":
-			iteratorFunc, _, err := operations.CreateIterator(updatedAfter, false)
-			if err != nil {
-				operations.RUnlock()
-				ws.Close()
-				return err
-			}
+		resultReader, _, err = operations.CreateReader(updatedAfter, false)
 
-			resultReader = NewEntryStreamFormatter(iteratorFunc, responseFormat)
+		if err != nil {
+			operations.RUnlock()
+			ws.Close()
+			return err
+		}
 
-			messageWriter, err = ws.NextWriter(websocket.TextMessage)
-			if err != nil {
-				operations.RUnlock()
-				ws.Close()
-				return err
-			}
-
-		default:
-			resultReader, _, err = operations.CreateReader(updatedAfter, false)
-
-			if err != nil {
-				operations.RUnlock()
-				ws.Close()
-				return err
-			}
-
-			messageWriter, err = ws.NextWriter(websocket.BinaryMessage)
-			if err != nil {
-				operations.RUnlock()
-				ws.Close()
-				return err
-			}
+		messageWriter, err = ws.NextWriter(websocket.BinaryMessage)
+		if err != nil {
+			operations.RUnlock()
+			ws.Close()
+			return err
 		}
 
 		FileDescriptors.Increment(operations.file)
@@ -396,26 +351,9 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 }
 
 func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
-	bodyBytes, err := ReadCompleteStream(r.Body)
+	serializedEntries, err := ReadCompleteStream(r.Body)
 	if err != nil {
 		return
-	}
-
-	bodyFormat := query.Get("format")
-	var serializedEntries []byte
-
-	switch bodyFormat {
-	case "tabbedJson", "tabbedJsonShort":
-		serializedEntries, err = SerializeFormattedEntries(bodyBytes, bodyFormat)
-		if err != nil {
-			endRequestWithError(w, r, http.StatusBadRequest, err)
-			return nil
-		}
-	case "", "raw":
-		serializedEntries = bodyBytes
-	default:
-		endRequestWithError(w, r, http.StatusBadRequest, errors.New("Unsupported format"))
-		return nil
 	}
 
 	// Commit transaction
@@ -457,26 +395,9 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 }
 
 func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
-	bodyBytes, err := ReadCompleteStream(r.Body)
+	serializedEntries, err := ReadCompleteStream(r.Body)
 	if err != nil {
 		return
-	}
-
-	bodyFormat := query.Get("format")
-	var serializedEntries []byte
-
-	switch bodyFormat {
-	case "tabbedJson", "tabbedJsonShort":
-		serializedEntries, err = SerializeFormattedEntries(bodyBytes, bodyFormat)
-		if err != nil {
-			endRequestWithError(w, r, http.StatusBadRequest, err)
-			return nil
-		}
-	case "", "raw":
-		serializedEntries = bodyBytes
-	default:
-		endRequestWithError(w, r, http.StatusBadRequest, errors.New("Unsupported format"))
-		return nil
 	}
 
 	// Rewrite the datastore

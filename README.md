@@ -17,7 +17,6 @@ Currently only tested on Linux and Windows. Might build on other platforms as we
 * [Configuration reference](https://github.com/zincbase/zincserver/blob/master/docs/Configuration%20reference.md)
 * [Technical overview](https://github.com/zincbase/zincserver/blob/master/docs/Technical%20overview.md)
 * [Binary format specification](https://github.com/zincbase/zincserver/blob/master/docs/Binary%20format%20specification.md)
-* [String formats specification](https://github.com/zincbase/zincserver/blob/master/docs/String%20formats%20specification.md)
 
 ## License
 

@@ -211,52 +211,50 @@ func DefaultServerConfig(masterKey string) []byte {
 		masterKeyHashHex = ""
 	}
 
-	defaultConfigAsTabbedJsonShort := `"['server']['masterKeyHash']"	"` + masterKeyHashHex + `"
-"['server']['http']['loopbackOnly']"	false
-"['server']['https']['loopbackOnly']"	false
-"['datastore']['compaction']['enabled']"	true
-"['datastore']['compaction']['minSize']"	4096
-"['datastore']['compaction']['minGrowthRatio']"	2
-"['datastore']['compaction']['minUnusedSizeRatio']"	0.5
-"['datastore']['flush']['enabled']"	true
-"['datastore']['flush']['maxDelay']"	1000
-"['datastore']['limit']['maxSize']"	100000000
-"['datastore']['CORS']['origin']['*']['allowed']"	true
-"['accessProfile']['Reader']['method']['GET']['allowed']"	true
-"['accessProfile']['Reader']['method']['GET']['param']['updatedAfter']['allowed']"	true
-"['accessProfile']['Reader']['method']['GET']['param']['format']['allowed']"	false
-"['accessProfile']['Reader']['method']['GET']['param']['waitUntilNonempty']['allowed']"	false
-"['accessProfile']['Reader']['method']['GET']['param']['compact']['allowed']"	false
-"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"	2000
-"['accessProfile']['Reader']['method']['GET']['limit']['requests']['count']"	10
-"['accessProfile']['Reader']['method']['WebSocket']['allowed']"	true
-"['accessProfile']['Reader']['method']['WebSocket']['param']['updatedAfter']['allowed']"	true
-"['accessProfile']['Reader']['method']['WebSocket']['param']['format']['allowed']"	false
-"['accessProfile']['Reader']['method']['WebSocket']['limit']['parallelConnections']['max']"	8
-"['accessProfile']['ReaderWriter']['method']['GET']['allowed']"	true
-"['accessProfile']['ReaderWriter']['method']['GET']['param']['updatedAfter']['allowed']"	true
-"['accessProfile']['ReaderWriter']['method']['GET']['param']['format']['allowed']"	false
-"['accessProfile']['ReaderWriter']['method']['GET']['param']['waitUntilNonempty']['allowed']"	false
-"['accessProfile']['ReaderWriter']['method']['GET']['param']['compact']['allowed']"	false
-"['accessProfile']['ReaderWriter']['method']['GET']['limit']['requests']['interval']"	2000
-"['accessProfile']['ReaderWriter']['method']['GET']['limit']['requests']['count']"	10
-"['accessProfile']['ReaderWriter']['method']['WebSocket']['allowed']"	true
-"['accessProfile']['ReaderWriter']['method']['WebSocket']['param']['updatedAfter']['allowed']"	true
-"['accessProfile']['ReaderWriter']['method']['WebSocket']['param']['format']['allowed']"	false
-"['accessProfile']['ReaderWriter']['method']['WebSocket']['limit']['parallelConnections']['max']"	8
-"['accessProfile']['ReaderWriter']['method']['POST']['allowed']"	true
-"['accessProfile']['ReaderWriter']['method']['POST']['param']['format']['allowed']"	true
-"['accessProfile']['ReaderWriter']['method']['POST']['limit']['requests']['interval']"	2000
-"['accessProfile']['ReaderWriter']['method']['POST']['limit']['requests']['count']"	10
-"['accessProfile']['ReaderWriter']['method']['PUT']['allowed']"	true
-"['accessProfile']['ReaderWriter']['method']['PUT']['param']['format']['allowed']"	true
-"['accessProfile']['ReaderWriter']['method']['PUT']['limit']['requests']['interval']"	2000
-"['accessProfile']['ReaderWriter']['method']['PUT']['limit']['requests']['count']"	10
-`
-	defaultConfigSerialized, err := SerializeFormattedEntries([]byte(defaultConfigAsTabbedJsonShort), "tabbedJsonShort")
+	defaultConfigStringEntries := []JsonEntry{
+		JsonEntry{`"['server']['masterKeyHash']"`, `"` + masterKeyHashHex + `"`},
+		JsonEntry{`"['server']['http']['loopbackOnly']"`, `false`},
+		JsonEntry{`"['server']['https']['loopbackOnly']"`, `false`},
 
-	if err != nil {
-		panic(err)
+		JsonEntry{`"['datastore']['compaction']['enabled']"`, `true`},
+		JsonEntry{`"['datastore']['compaction']['minSize']"`, `4096`},
+		JsonEntry{`"['datastore']['compaction']['minGrowthRatio']"`, `2`},
+		JsonEntry{`"['datastore']['compaction']['minUnusedSizeRatio']"`, `0.5`},
+
+		JsonEntry{`"['datastore']['flush']['enabled']"`, `true`},
+		JsonEntry{`"['datastore']['flush']['maxDelay']"`, `1000`},
+		JsonEntry{`"['datastore']['limit']['maxSize']"`, `100000000`},
+
+		JsonEntry{`"['datastore']['CORS']['origin']['*']['allowed']"`, `true`},
+
+		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['param']['updatedAfter']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['param']['waitUntilNonempty']['allowed']"`, `false`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['param']['compact']['allowed']"`, `false`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"`, `2000`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['limit']['requests']['count']"`, `10`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['WebSocket']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['WebSocket']['param']['updatedAfter']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['WebSocket']['limit']['parallelConnections']['max']"`, `8`},
+
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['param']['updatedAfter']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['param']['waitUntilNonempty']['allowed']"`, `false`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['param']['compact']['allowed']"`, `false`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['limit']['requests']['interval']"`, `2000`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['limit']['requests']['count']"`, `10`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['WebSocket']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['WebSocket']['param']['updatedAfter']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['WebSocket']['limit']['parallelConnections']['max']"`, `8`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['POST']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['POST']['limit']['requests']['interval']"`, `2000`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['POST']['limit']['requests']['count']"`, `10`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['PUT']['allowed']"`, `true`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['PUT']['limit']['requests']['interval']"`, `2000`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['PUT']['limit']['requests']['count']"`, `10`},
 	}
+
+	defaultConfigSerialized := SerializeJsonEntries(defaultConfigStringEntries)
+
 	return defaultConfigSerialized
 }

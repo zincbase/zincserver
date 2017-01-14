@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"log"
 	"reflect"
 	"testing"
@@ -48,59 +47,6 @@ func Test_EntrySerializer(test *testing.T) {
 		deserializedEntry := DeserializeEntry(serializedEntry)
 
 		if !EntriesAreEqual(deserializedEntry, &testEntry) {
-			test.Error("Data mismatch.")
-		}
-	})
-
-	test.Run("Formatted entry serialization (tabbedJson)", func(test *testing.T) {
-		testEntries := []Entry{
-			Entry{
-				PrimaryHeader: &EntryPrimaryHeader{
-					UpdateTime:  23422523422343423,
-					CommitTime:  23422523422343423,
-					KeyFormat:   DataFormat_JSON,
-					ValueFormat: DataFormat_JSON,
-				},
-				Key:   []byte(`"Key1"`),
-				Value: []byte(`"Value1"`),
-			},
-			Entry{
-				PrimaryHeader: &EntryPrimaryHeader{
-					UpdateTime:  23422523422343425,
-					CommitTime:  23422523422343425,
-					KeyFormat:   DataFormat_JSON,
-					ValueFormat: DataFormat_JSON,
-				},
-				Key:   []byte(`"Key2"`),
-				Value: []byte(`"Value2"`),
-			},
-			Entry{
-				PrimaryHeader: &EntryPrimaryHeader{
-					UpdateTime:  23422523422343427,
-					CommitTime:  23422523422343427,
-					KeyFormat:   DataFormat_JSON,
-					ValueFormat: DataFormat_JSON,
-				},
-				Key:   []byte(`"Key3"`),
-				Value: []byte(`"Value3"`),
-			},
-		}
-
-		serializedEntries := SerializeEntries(testEntries)
-		iterator := NewEntryStreamIterator(bytes.NewReader(serializedEntries), 0, int64(len(serializedEntries)), false)
-		formatter := NewEntryStreamFormatter(iterator, "tabbedJson")
-		formattedEntries, err := ReadCompleteStream(formatter)
-		if err != nil {
-			test.Error(err)
-		}
-
-		parsedEntries, err := ParseFormattedEntries(formattedEntries, "tabbedJson")
-		if err != nil {
-			test.Error(err)
-		}
-		log.Println(parsedEntries)
-
-		if !EntryArraysAreEqual(parsedEntries, testEntries) {
 			test.Error("Data mismatch.")
 		}
 	})

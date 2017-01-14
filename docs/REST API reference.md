@@ -7,7 +7,7 @@ Read the content of a datastore.
 **Example**:
 
 ```
-GET https://mydomain.com/datastore/MyDatastore?updatedAfter=1464852127534534&accessKey=3da541559918a808c2402bba5012f6c6
+GET https://example.com:1337/datastore/MyDatastore?updatedAfter=1464852127534534&accessKey=3da541559918a808c2402bba5012f6c6
 ```
 
 **Arguments**:
@@ -27,7 +27,7 @@ Create a WebSocket to both fetch existing data, and receive real-time updates fo
 **Example**:
 
 ```
-GET (WebSocket upgrade) wss://mydomain.com:1337/datastore/MyDatastore?updatedAfter=1464852127534534&accessKey=3da541559918a808c2402bba5012f6c6
+GET (WebSocket upgrade) wss://example.com:1337/datastore/MyDatastore?updatedAfter=1464852127534534&accessKey=3da541559918a808c2402bba5012f6c6
 ```
 
 **Arguments**:
@@ -46,10 +46,10 @@ Commit new revisions to the datastore.
 
 * `accessKey`(string, optional): Access key.
 
-**Example (1)**:
+**Example**:
 
 ```
-POST https://mydomain.com:1337/datastore/MyDatastore&accessKey=3da541559918a808c2402bba5012f6c6
+POST https://example.com:1337/datastore/MyDatastore&accessKey=3da541559918a808c2402bba5012f6c6
 ```
 Request body containing a stream of [serialized revision entries](https://github.com/zincbase/zincserver/blob/master/docs/Binary%20format%20specification.md).
 
@@ -72,7 +72,7 @@ Destroys the entire datastore. All data is permanently deleted.
 **Example**:
 
 ```
-DELETE https://mydomain.com:1337/datastore/MyDatastore&accessKey=3da541559918a808c2402bba5012f6c6
+DELETE https://example.com:1337/datastore/MyDatastore&accessKey=3da541559918a808c2402bba5012f6c6
 ```
 
 **Notes**:

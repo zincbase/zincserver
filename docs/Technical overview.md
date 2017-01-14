@@ -7,7 +7,7 @@ ZincServer is a _chronological keyed datastore_. It is a time-based, key-aware s
 3. Rewrite the datastore with a set of new revisions (`PUT` operation).
 4. Delete the datastore (`DELETE` operation).
 
-Each datastore is persisted in a single, append-only file. Each revision (or more precisely "revision message") is a binary block of data consisting of a header, a key and a value. Revisions are stored sequentially in the file, strictly ordered by time.
+Each datastore is persisted in a single, append-only file. Each revision (or more precisely _revision message_) is a binary block of data consisting of a header, a key and a value. Revisions are stored sequentially in the file, strictly ordered by commit time.
 
 A datastore file is internally structured like the following:
 ```
@@ -21,15 +21,15 @@ When a datastore is first referenced in a request, it is loaded (as well as its 
 (timestamp, offset), (timestamp, offset), (timestamp, offset), (timestamp, offset), ... 
 ```
 
-1. To serve a `GET` request, the index is searched using linear/binary search and the offset of the earliest matching revision is found. The file is then read as-is, directly from disk, starting at the resulting offset and streamed to the response in binary, or incrementally converted into a target string format (`?format=...`). Note that this data may contain some amount of duplicate revisions (depending on the frequency of compactions). These are managed at the receiving client by keeping only the latest revision of a particular key and ignoring earlier ones (an experimental `&compact=true` argument is also available, which would perform the compaction on the server side, but should not be generally used).
+1. To serve a `GET` request, the index is searched using linear/binary search and the offset of the earliest matching revision is found. The file is then read as-is, directly from disk, starting at the resulting offset and streamed to the response in binary. Note that this data may contain some amount of duplicate revisions (depending on the frequency of compactions). These are managed at the receiving client by keeping only the latest revision of a particular key and ignoring earlier ones.
 
-2. To serve a 'POST' request, a bulk of raw revision data is sent by the client in the request body. These revisions are processed as a single transaction: scanned and verified, and stamped with a commit timestamp (microsecond resolution), where the last one of them receives a 'transaction end' flag. They are then appended to the datastore file and added to the index.
+2. To serve a 'POST' request, a bulk of serialized revision data is sent by the client in the request body. These revisions are processed as a single transaction: scanned and verified, and stamped with a commit timestamp (microsecond resolution), where the last one of them receives a 'transaction end' flag. They are then appended to the datastore file and added to the index.
 
 3. A 'PUT' request is similar to 'POST' only the database is cleared before the new revisions are written.
 
 4. To compact the datastore, the datastore file is read and scanned to create a hash table that maps a key to its latest revision, and then rewritten only to include the latest revisions of each key.
 
-Note: in order to 'delete' a particular key, a revision with that key is added with a zero-length value. This revision is still stored in the datastore and kept throughout compactions. In order to permanently delete a key, either the database needs to be rewritten or a compaction should be run with a special 'purge' flag (not currently implemented) that would permanently remove any revisions with no values.
+Note: in order to 'delete' a particular key, a revision with that key is added with a zero-length value. This revision is still stored in the datastore and kept throughout compactions. In order to permanently delete a key, either the database needs to be rewritten, or a compaction should be run with a special 'purge' flag (not currently implemented) that would permanently remove any revisions with no values.
 
 ## Managing concurrency between readers, writers and compactions
 

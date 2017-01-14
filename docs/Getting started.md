@@ -68,3 +68,7 @@ and give it the value `"Reader"` (note the string used in the path is the hex en
 ## Modifying and creating access profiles, configuring limits, quotas and misc settings
 
 Please continue to the [configuration reference](https://github.com/zincbase/zincserver/blob/master/docs/Configuration%20reference.md) for more details.
+
+## Low level REST API
+
+Please continue to the [REST API reference](https://github.com/zincbase/zincserver/blob/master/docs/REST%20API%20reference.md).

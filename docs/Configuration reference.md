@@ -39,4 +39,4 @@ Datastore settings are settings applied to each datastore (or globally to all da
 * `["datastore","compaction","minSize"]` (integer): Minimal datastore file size threshold for compaction checks to be performed.
 * `["datastore","compaction","minUnusedSizeRatio"]` (float): Minimal ratio between the unused (redundant) and total datastore file size that would cause a compaction to be performed.
 * `["datastore","compaction","minGrowthRatio"]` (float): Minimal ratio between the current datastore size to its size when the previous compaction check was performed, such that subsequent compaction check is triggered.
-* `["datastore","CORS","origin",<OriginURI | "*">,"allowed"]` (boolean): Allow cross-origin requests from the origin specified in the path. Specifying origin URI as `"*"` would apply to all origins. This option is only relevant if the command-line `-enableCORS` flag is provided and set to `true` when the server is launched.
+* `["datastore","CORS","origin",<OriginURI | "*">,"allowed"]` (boolean): Allow cross-origin requests from the origin specified in the path. Specifying origin URI as `"*"` would apply to all origins.

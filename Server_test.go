@@ -1,15 +1,13 @@
 package main
 
 import (
+    . "github.com/onsi/ginkgo"
+    . "github.com/onsi/gomega"
 	"log"
-	//"reflect"
-	"testing"
 	"time"
-	//"bytes"
-	//"sourcegraph.com/sqs/goreturns/returns"
 )
 
-func Test_Server(t *testing.T) {
+var _ = Describe("Server", func() {
 	setEntryTimestamps := func(entries []Entry, timestamp int64) {
 		for i := 0; i < len(entries); i++ {
 			entries[i].PrimaryHeader.CommitTime = timestamp
@@ -35,117 +33,87 @@ func Test_Server(t *testing.T) {
 	var server *Server
 	var client *Client
 
-	beforeEach := func() {
+	BeforeEach(func() {
 		testEntries = getTestEntries()
 		server = NewServer(config)
 		client = NewClient("http://localhost:12345", RandomWordString(10), "")
 		server.Start()
-	}
+	})
 
-	afterEach := func() {
+	AfterEach(func() {
 		client.Delete()
 		server.Stop()
 		time.Sleep(10 * time.Millisecond)
-	}
+	})
 
-	t.Run("Put and Get entries", func(t *testing.T) {
-		beforeEach()
-		defer afterEach()
-
+	It("Puts and gets entries", func() {
 		commitTimestamp, err := client.Put(testEntries[0:2])
-		if err != nil {
-			t.Error(err)
-		}
 
-		log.Println(commitTimestamp)
+		Expect(err).To(BeNil())
+		Expect(commitTimestamp).ToNot(BeNil())
+		Expect(commitTimestamp).To(BeNumerically(">", 0))
+
 		setEntryTimestamps(testEntries[0:2], commitTimestamp)
 
 		returnedEntries, err := client.Get(0)
 
-		if err != nil {
-			t.Error(err)
-		}
+		Expect(err).To(BeNil())
 
 		log.Println(returnedEntries)
 		log.Println(testEntries[0:2])
 
-		if !EntryArraysAreEqual(returnedEntries[1:], testEntries[0:2]) {
-			t.Error("Returned data did not match")
-		}
+		ExpectEntryArraysToBeEqual(returnedEntries[1:], testEntries[0:2]);
 
-		if returnedEntries[0].PrimaryHeader.Flags&Flag_CreationEvent != Flag_CreationEvent ||
-			len(returnedEntries[0].Key) != 0 ||
-			len(returnedEntries[0].Value) != 0 {
-			t.Error("Invalid creation entry returned")
-		}
+		Expect(returnedEntries[0].PrimaryHeader.Flags&Flag_CreationEvent).To(Equal(Flag_CreationEvent))
+		Expect(returnedEntries[0].Key).To(HaveLen(0))
+		Expect(returnedEntries[0].Value).To(HaveLen(0))
 	})
 
-	t.Run("Post and Get entries", func(t *testing.T) {
-		beforeEach()
-		defer afterEach()
-
+	It("Posts and gets entries", func() {
 		commitTimestamp, err := client.Put(testEntries[0:2])
-		if err != nil {
-			t.Error(err)
-		}
+
+		Expect(err).To(BeNil())
+		Expect(commitTimestamp).ToNot(BeNil())
+		Expect(commitTimestamp).To(BeNumerically(">", 0))
 
 		setEntryTimestamps(testEntries[0:2], commitTimestamp)
 
 		commitTimestamp, err = client.Post(testEntries[2:5])
-		if err != nil {
-			t.Error(err)
-		}
+		Expect(err).To(BeNil())		
+		Expect(commitTimestamp).ToNot(BeNil())
+		Expect(commitTimestamp).To(BeNumerically(">", 0))		
 
 		setEntryTimestamps(testEntries[2:5], commitTimestamp)
 
 		returnedEntries, err := client.Get(0)
+		
+		Expect(err).To(BeNil())
+		ExpectEntryArraysToBeEqual(returnedEntries[1:], testEntries[0:5])
 
-		if err != nil {
-			t.Error(err)
-		}
-
-		log.Println(returnedEntries)
-
-		if !EntryArraysAreEqual(returnedEntries[1:], testEntries[0:5]) {
-			t.Error("Returned data did not match")
-		}
-
-		if returnedEntries[0].PrimaryHeader.Flags&Flag_CreationEvent != Flag_CreationEvent ||
-			len(returnedEntries[0].Key) != 0 ||
-			len(returnedEntries[0].Value) != 0 {
-			t.Error("Invalid creation entry returned")
-		}
+		Expect(returnedEntries[0].PrimaryHeader.Flags&Flag_CreationEvent).To(Equal(Flag_CreationEvent))
+		Expect(returnedEntries[0].Key).To(HaveLen(0))
+		Expect(returnedEntries[0].Value).To(HaveLen(0))
 	})
 
-	t.Run("Put, Post and Get entries after timestamp", func(t *testing.T) {
-		beforeEach()
-		defer afterEach()
-
+	It("Puts, posts and gets entries after timestamp", func() {
 		commitTimestamp, err := client.Put(testEntries[0:2])
-		log.Println(commitTimestamp)
-		if err != nil {
-			t.Error(err)
-		}
+
+		Expect(err).To(BeNil())
+		Expect(commitTimestamp).ToNot(BeNil())
+		Expect(commitTimestamp).To(BeNumerically(">", 0))
 
 		setEntryTimestamps(testEntries[0:2], commitTimestamp)
 
 		commitTimestamp, err = client.Post(testEntries[2:5])
-		if err != nil {
-			t.Error(err)
-		}
+		Expect(err).To(BeNil())		
+		Expect(commitTimestamp).ToNot(BeNil())
+		Expect(commitTimestamp).To(BeNumerically(">", 0))		
 
 		setEntryTimestamps(testEntries[2:5], commitTimestamp)
 
 		returnedEntries, err := client.Get(commitTimestamp - 1)
 
-		if err != nil {
-			t.Error(err)
-		}
-
-		log.Println(returnedEntries)
-
-		if !EntryArraysAreEqual(returnedEntries, testEntries[2:5]) {
-			t.Error("Returned data did not match")
-		}
-	})
-}
+		Expect(err).To(BeNil())		
+		ExpectEntryArraysToBeEqual(returnedEntries, testEntries[2:5])
+	})	
+})

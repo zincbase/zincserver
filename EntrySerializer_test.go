@@ -1,13 +1,14 @@
 package main
 
 import (
-	"log"
-	"reflect"
-	"testing"
+    . "github.com/onsi/ginkgo"
+    . "github.com/onsi/gomega"	
+	. "github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
 )
 
-func Test_EntrySerializer(test *testing.T) {
-	test.Run("Header serialization", func(test *testing.T) {
+var _ = Describe("EntrySerializer", func() {
+	It("Serializes a primary header", func() {
 		testHeader := &EntryPrimaryHeader{
 			TotalSize:           33452341,
 			CommitTime:          345343452345,
@@ -21,19 +22,13 @@ func Test_EntrySerializer(test *testing.T) {
 
 		serializedHeader := make([]byte, PrimaryHeaderSize)
 		WritePrimaryHeader(serializedHeader, testHeader)
-		deserializedHeader := ReadPrimaryHeader(serializedHeader)
+		deserializedHeader := ReadPrimaryHeader(serializedHeader)	
 
-		log.Println(testHeader)
-		log.Println(serializedHeader)
-		log.Println(deserializedHeader)
-
-		if !reflect.DeepEqual(*testHeader, *deserializedHeader) {
-			test.Error("Data mismatch.")
-		}
+		Expect(*testHeader).To(Equal(*deserializedHeader))
 	})
 
-	test.Run("Entry serialization", func(test *testing.T) {
-		testEntry := Entry{
+	It("Deserializes a header", func() {
+		testEntry := Entry {
 			PrimaryHeader: &EntryPrimaryHeader{
 				CommitTime:  23422523422343423,
 				KeyFormat:   DataFormat_UTF8,
@@ -46,47 +41,26 @@ func Test_EntrySerializer(test *testing.T) {
 		serializedEntry := SerializeEntry(&testEntry)
 		deserializedEntry := DeserializeEntry(serializedEntry)
 
-		if !EntriesAreEqual(deserializedEntry, &testEntry) {
-			test.Error("Data mismatch.")
-		}
+		Expect(*deserializedEntry).To(EqualEntry(testEntry))
 	})
+})
+
+func EqualEntry(expected Entry) types.GomegaMatcher {
+	return SatisfyAll(
+		BeAssignableToTypeOf(Entry{nil, []byte{}, []byte{}}),
+		MatchAllFields(Fields {
+			"PrimaryHeader": Equal(expected.PrimaryHeader),
+			"Key": Equal(expected.Key),
+			"Value": Equal(expected.Value),
+		}),
+	)
 }
 
-func EntriesAreEqual(entry1 *Entry, entry2 *Entry) bool {
-	if !reflect.DeepEqual(entry1.Key, entry2.Key) {
-		return false
-	}
-
-	if !reflect.DeepEqual(entry1.Value, entry2.Value) {
-		return false
-	}
-
-	if (entry1.PrimaryHeader == nil && entry2.PrimaryHeader != nil) || (entry1.PrimaryHeader != nil && entry2.PrimaryHeader == nil) {
-		return false
-	}
-
-	if entry1.PrimaryHeader == nil {
-		return true
-	}
-
-	if !reflect.DeepEqual(*entry1.PrimaryHeader, *entry2.PrimaryHeader) {
-		log.Println(*entry1.PrimaryHeader)
-		log.Println(*entry2.PrimaryHeader)
-		return false
-	}
-
-	return true
-}
-
-func EntryArraysAreEqual(entries1 []Entry, entries2 []Entry) bool {
-	if len(entries1) != len(entries2) {
-		return false
-	}
+func ExpectEntryArraysToBeEqual(entries1 []Entry, entries2 []Entry) bool {
+	Expect(entries1).To(HaveLen(len(entries2)))
 
 	for i := 0; i < len(entries1); i++ {
-		if !EntriesAreEqual(&entries1[i], &entries2[i]) {
-			return false
-		}
+		Expect(entries1[i]).To(EqualEntry(entries2[i]))
 	}
 
 	return true

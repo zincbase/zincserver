@@ -1,16 +1,14 @@
 package main
 
 import (
-	"testing"
-	//"io"
+    . "github.com/onsi/ginkgo"
+    . "github.com/onsi/gomega"
 	"bytes"
 	"log"
-	"reflect"
 )
 
-func Test_DatastoreKeyIndex(test *testing.T) {
-
-	test.Run("Indexes a set of entries", func(test *testing.T) {
+var _ = Describe("DatastoreKeyIndex", func() {
+	It("Indexes a set of entries", func() {
 		entry1 := SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 1}, []byte("Key1"), []byte("Value1")})
 		entry2 := SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 2}, []byte("Key2"), []byte("Value2")})
 		entry3 := SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Key1"), []byte("Value3")})
@@ -26,14 +24,7 @@ func Test_DatastoreKeyIndex(test *testing.T) {
 		log.Println(keyIndex.GetCompactedRanges(0, true))
 		result, err := keyIndex.CompactToBuffer(bytes.NewReader(testData), 0)
 
-		if err != nil {
-			test.Error(err)
-		}
-
-		if !reflect.DeepEqual(result, ConcatBuffers(entry4, entry5, entry7)) {
-			test.Error("Compaction didn't work correctly")
-			log.Println(result)
-			log.Println(ConcatBuffers(entry4, entry5, entry7))
-		}
+		Expect(err).To(BeNil())
+		Expect(result).To(Equal(ConcatBuffers(entry4, entry5, entry7)))		
 	})
-}
+})

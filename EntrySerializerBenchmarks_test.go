@@ -36,5 +36,4 @@ func Benchmark_EntrySerializer(bench *testing.B) {
 			_ = DeserializeEntry(serializedTestEntry)
 		}
 	})
-
 }

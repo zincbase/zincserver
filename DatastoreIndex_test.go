@@ -12,13 +12,13 @@ var _ = Describe("DatastoreIndex", func() {
 		index := NewDatastoreIndex()
 
 		testEntries := []*Entry{
-			&Entry{&EntryPrimaryHeader{CommitTime: 1}, []byte("Key1"), []byte("Value1")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Key2"), []byte("Value2")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 4}, []byte("Key1"), []byte("Value3")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Key1"), []byte("Value4")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 8}, []byte("Key2"), []byte("Value5")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 9}, []byte("Key3"), []byte("Value6")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Key3"), []byte("Value7")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 1}, []byte{}, []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte{}, []byte("Key2"), []byte("Value2")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 4}, []byte{}, []byte("Key1"), []byte("Value3")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte{}, []byte("Key1"), []byte("Value4")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 8}, []byte{}, []byte("Key2"), []byte("Value5")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 9}, []byte{}, []byte("Key3"), []byte("Value6")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key3"), []byte("Value7")},
 		}
 
 		serializedEntries := make([][]byte, len(testEntries))
@@ -46,12 +46,12 @@ var _ = Describe("DatastoreIndex", func() {
 		index := NewDatastoreIndex()
 
 		testEntries := []*Entry{
-			&Entry{&EntryPrimaryHeader{CommitTime: 2}, []byte("Key1"), []byte("Value1")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Key2"), []byte("Value2")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Key1"), []byte("Value3")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Key1"), []byte("Value4")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Key2"), []byte("Value5")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Key3"), []byte("Value7")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 2}, []byte{}, []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte{}, []byte("Key2"), []byte("Value2")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte{}, []byte("Key1"), []byte("Value3")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte{}, []byte("Key1"), []byte("Value4")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte{}, []byte("Key2"), []byte("Value5")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key3"), []byte("Value7")},
 		}
 
 		serializedEntries := make([][]byte, len(testEntries))
@@ -82,12 +82,12 @@ var _ = Describe("DatastoreIndex", func() {
 		Expect(index.LatestUpdateTimestamp()).To(Equal(int64(-1)))
 
 		testEntries := []*Entry{
-			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value1")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Key2"), []byte("Value2")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value3")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value4")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte("Key2"), []byte("Value5")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Key3"), []byte("Value7")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key2"), []byte("Value2")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key1"), []byte("Value3")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd},[]byte{}, []byte("Key1"), []byte("Value4")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key2"), []byte("Value5")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key3"), []byte("Value7")},
 		}
 
 		serializedEntries := make([][]byte, len(testEntries))

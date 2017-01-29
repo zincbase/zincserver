@@ -13,9 +13,10 @@ import (
 const PrimaryHeaderSize = 32
 
 type Entry struct {
-	PrimaryHeader *EntryPrimaryHeader
-	Key           []byte
-	Value         []byte
+	PrimaryHeader        *EntryPrimaryHeader
+	SecondaryHeaderBytes []byte
+	Key                  []byte
+	Value                []byte
 }
 
 type EntryPrimaryHeader struct {
@@ -36,10 +37,11 @@ const (
 	DataFormat_Binary   uint8 = 0
 	DataFormat_UTF8     uint8 = 1
 	DataFormat_JSON     uint8 = 2
+	DataFormat_OmniJSON uint8 = 3
 )
 
 type JsonEntry struct {
-	key string
+	key   string
 	value string
 }
 
@@ -57,15 +59,19 @@ func SerializeEntries(entries []Entry) []byte {
 }
 
 func SerializeEntry(entry *Entry) (serializedEntry []byte) {
-	totalSize := int64(PrimaryHeaderSize + len(entry.Key) + len(entry.Value))
+	secondaryHeaderSize := uint16(len(entry.SecondaryHeaderBytes))
 	keySize := uint16(len(entry.Key))
+	valueSize := int64(len(entry.Value))
+	totalSize := int64(PrimaryHeaderSize + int(secondaryHeaderSize) + int(keySize) + int(valueSize))
+
 	timestamp := MonoUnixTimeMicro()
 
 	if entry.PrimaryHeader == nil {
 		entry.PrimaryHeader = &EntryPrimaryHeader{
-			TotalSize:  totalSize,
-			UpdateTime: timestamp,
-			KeySize:    keySize,
+			TotalSize:           totalSize,
+			UpdateTime:          timestamp,
+			KeySize:             keySize,
+			SecondaryHeaderSize: secondaryHeaderSize,
 		}
 	} else {
 		entry.PrimaryHeader.TotalSize = totalSize
@@ -73,19 +79,24 @@ func SerializeEntry(entry *Entry) (serializedEntry []byte) {
 			entry.PrimaryHeader.UpdateTime = timestamp
 		}
 		entry.PrimaryHeader.KeySize = keySize
+		entry.PrimaryHeader.SecondaryHeaderSize = secondaryHeaderSize
 	}
+
+	secondaryHeaderOffset := PrimaryHeaderSize
+	keyOffset := int64(secondaryHeaderOffset) + int64(secondaryHeaderSize)
+	valueOffset := keyOffset + int64(keySize)
 
 	serializedEntry = make([]byte, totalSize)
 
-	WritePrimaryHeader(serializedEntry[0:PrimaryHeaderSize], entry.PrimaryHeader)
-
-	copy(serializedEntry[PrimaryHeaderSize:PrimaryHeaderSize+keySize], entry.Key)
-	copy(serializedEntry[PrimaryHeaderSize+keySize:], entry.Value)
+	SerializePrimaryHeader(serializedEntry[0:secondaryHeaderOffset], entry.PrimaryHeader)
+	copy(serializedEntry[secondaryHeaderOffset:keyOffset], entry.SecondaryHeaderBytes)
+	copy(serializedEntry[keyOffset:valueOffset], entry.Key)
+	copy(serializedEntry[valueOffset:], entry.Value)
 
 	return
 }
 
-func WritePrimaryHeader(targetSlice []byte, header *EntryPrimaryHeader) {
+func SerializePrimaryHeader(targetSlice []byte, header *EntryPrimaryHeader) {
 	*(*EntryPrimaryHeader)(unsafe.Pointer(&targetSlice[0])) = *header
 }
 
@@ -93,13 +104,14 @@ func SerializeJsonEntries(jsonEntries []JsonEntry) []byte {
 	entries := []Entry{}
 
 	for _, jsonEntry := range jsonEntries {
-		entries = append(entries, Entry{ 
-			PrimaryHeader: &EntryPrimaryHeader{ 
-				KeyFormat: DataFormat_JSON, 
+		entries = append(entries, Entry{
+			PrimaryHeader: &EntryPrimaryHeader{
+				KeyFormat:   DataFormat_JSON,
 				ValueFormat: DataFormat_JSON,
-			}, 
-			Key: []byte(jsonEntry.key), 
-			Value: []byte(jsonEntry.value),
+			},
+			SecondaryHeaderBytes: []byte{},
+			Key:                  []byte(jsonEntry.key),
+			Value:                []byte(jsonEntry.value),
 		})
 	}
 
@@ -129,15 +141,21 @@ func DeserializeEntryStreamReader(source io.ReaderAt, startOffset int64, endOffs
 			return results, err
 		}
 
+		secondaryHeaderBytes, err := iteratorResult.ReadSecondaryHeaderBytes()
+		if err != nil {
+			return nil, err
+		}
+
 		key, value, err := iteratorResult.ReadKeyAndValue()
 		if err != nil {
 			return nil, err
 		}
 
 		results = append(results, Entry{
-			PrimaryHeader: iteratorResult.PrimaryHeader,
-			Key:           key,
-			Value:         value,
+			PrimaryHeader:        iteratorResult.PrimaryHeader,
+			SecondaryHeaderBytes: secondaryHeaderBytes,
+			Key:                  key,
+			Value:                value,
 		})
 	}
 }
@@ -147,16 +165,21 @@ func DeserializeEntry(entryBytes []byte) *Entry {
 }
 
 func DeserializePrimaryHeaderAndRemainderBytes(primaryHeaderBytes []byte, remainderBytes []byte) *Entry {
-	primaryHeader := ReadPrimaryHeader(primaryHeaderBytes)
+	primaryHeader := DeserializePrimaryHeader(primaryHeaderBytes)
+
+	secondaryHeaderOffset := int64(0)
+	keyOffset := secondaryHeaderOffset + int64(primaryHeader.SecondaryHeaderSize)
+	valueOffset := keyOffset + int64(primaryHeader.KeySize)
 
 	return &Entry{
-		PrimaryHeader: primaryHeader,
-		Key:           remainderBytes[primaryHeader.SecondaryHeaderSize : primaryHeader.SecondaryHeaderSize+primaryHeader.KeySize],
-		Value:         remainderBytes[primaryHeader.SecondaryHeaderSize+primaryHeader.KeySize:],
+		PrimaryHeader:        primaryHeader,
+		SecondaryHeaderBytes: remainderBytes[secondaryHeaderOffset:keyOffset],
+		Key:                  remainderBytes[keyOffset:valueOffset],
+		Value:                remainderBytes[valueOffset:],
 	}
 }
 
-func ReadPrimaryHeader(primaryHeaderBytes []byte) *EntryPrimaryHeader {
+func DeserializePrimaryHeader(primaryHeaderBytes []byte) *EntryPrimaryHeader {
 	return (*EntryPrimaryHeader)(unsafe.Pointer(&primaryHeaderBytes[0]))
 }
 
@@ -201,7 +224,7 @@ func ValidateAndPrepareTransaction(entryStream []byte, newTimestamp int64) error
 
 		if iteratorResult.PrimaryHeader.UpdateTime < minAllowedTimestamp {
 			return errors.New("Encountered an entry header containing an update time smaller than 1483221600 * 1000000 (Januaray 1st 2017, 00:00).")
-		}		
+		}
 
 		if iteratorResult.PrimaryHeader.UpdateTime > maxAllowedTimestamp {
 			return errors.New("Encountered an entry header containing an update time greater than 30 seconds past the server's clock.")
@@ -215,7 +238,7 @@ func ValidateAndPrepareTransaction(entryStream []byte, newTimestamp int64) error
 			iteratorResult.PrimaryHeader.Flags |= Flag_TransactionEnd
 		}
 
-		WritePrimaryHeader(entryStream[iteratorResult.Offset:], iteratorResult.PrimaryHeader)
+		SerializePrimaryHeader(entryStream[iteratorResult.Offset:], iteratorResult.PrimaryHeader)
 	}
 }
 
@@ -223,7 +246,7 @@ func ValidateAndPrepareTransaction(entryStream []byte, newTimestamp int64) error
 // Datastore creation
 ////////////////////////////////////////////////////////////////////////////////
 func CreateNewDatastoreReader(newDatastoreContentReader io.Reader, creationTimestamp int64) io.Reader {
-	creationEntry := SerializeEntry(&Entry{&EntryPrimaryHeader{UpdateTime: creationTimestamp, CommitTime: creationTimestamp, Flags: Flag_TransactionEnd | Flag_CreationEvent}, []byte{}, []byte{}})
+	creationEntry := SerializeEntry(&Entry{&EntryPrimaryHeader{UpdateTime: creationTimestamp, CommitTime: creationTimestamp, Flags: Flag_TransactionEnd | Flag_CreationEvent}, []byte{}, []byte{}, []byte{}})
 	return io.MultiReader(bytes.NewReader(creationEntry), newDatastoreContentReader)
 }
 

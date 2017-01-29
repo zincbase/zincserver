@@ -38,7 +38,7 @@ func NewEntryStreamIterator(source io.ReaderAt, startOffset int64, endOffset int
 			}
 		}
 
-		header := ReadPrimaryHeader(headerBytes)
+		header := DeserializePrimaryHeader(headerBytes)
 
 		iteratorResult := &EntryStreamIteratorResult{
 			source:        source,
@@ -87,7 +87,7 @@ func NewEntryRangeListIterator(source io.ReaderAt, ranges []Range, checkTransact
 			}
 		}
 
-		header := ReadPrimaryHeader(headerBytes)
+		header := DeserializePrimaryHeader(headerBytes)
 
 		iteratorResult := &EntryStreamIteratorResult{
 			source:        source,
@@ -118,10 +118,18 @@ func (this *EntryStreamIteratorResult) ReadKey() (key []byte, err error) {
 	return
 }
 
+func (this *EntryStreamIteratorResult) CreateKeyReader() io.Reader {
+	return NewRangeReader(this.source, this.KeyOffset(), this.ValueOffset())
+}
+
 func (this *EntryStreamIteratorResult) ReadValue() (value []byte, err error) {
 	value = make([]byte, this.ValueSize())
 	_, err = this.source.ReadAt(value, this.ValueOffset())
 	return
+}
+
+func (this *EntryStreamIteratorResult) CreateValueReader() io.Reader {
+	return NewRangeReader(this.source, this.ValueOffset(), this.EndOffset())
 }
 
 func (this *EntryStreamIteratorResult) ReadKeyAndValue() (key []byte, value []byte, err error) {
@@ -132,16 +140,22 @@ func (this *EntryStreamIteratorResult) ReadKeyAndValue() (key []byte, value []by
 	return
 }
 
-func (this *EntryStreamIteratorResult) CreateKeyReader() io.Reader {
-	return NewRangeReader(this.source, this.KeyOffset(), this.ValueOffset())
+func (this *EntryStreamIteratorResult) ReadSecondaryHeaderBytes() (secondaryHeaderBytes []byte, err error) {
+	secondaryHeaderBytes = make([]byte, this.SecondaryHeaderSize())
+	_, err = this.source.ReadAt(secondaryHeaderBytes, this.SecondaryHeaderOffset())
+	return 
 }
 
-func (this *EntryStreamIteratorResult) CreateValueReader() io.Reader {
-	return NewRangeReader(this.source, this.ValueOffset(), this.EndOffset())
+func (this *EntryStreamIteratorResult) SecondaryHeaderOffset() int64 {
+	return this.Offset + int64(PrimaryHeaderSize)
+}
+
+func (this *EntryStreamIteratorResult) SecondaryHeaderSize() int64 {
+	return int64(this.PrimaryHeader.SecondaryHeaderSize)
 }
 
 func (this *EntryStreamIteratorResult) KeyOffset() int64 {
-	return this.Offset + int64(PrimaryHeaderSize) + int64(this.PrimaryHeader.SecondaryHeaderSize)
+	return this.SecondaryHeaderOffset() + int64(this.PrimaryHeader.SecondaryHeaderSize)
 }
 
 func (this *EntryStreamIteratorResult) KeySize() int64 {
@@ -162,4 +176,8 @@ func (this *EntryStreamIteratorResult) EndOffset() int64 {
 
 func (this *EntryStreamIteratorResult) HasTransactionEndFlag() bool {
 	return this.PrimaryHeader.Flags&Flag_TransactionEnd == Flag_TransactionEnd
+}
+
+func (this *EntryStreamIteratorResult) IsCreationEvent() bool {
+	return this.PrimaryHeader.Flags&Flag_CreationEvent == Flag_CreationEvent
 }

@@ -6,7 +6,7 @@ import (
 )
 
 var _ = Describe("EntrySerializer", func() {
-	It("Serializes a primary header", func() {
+	It("Serializes and deserializes a primary header", func() {
 		testHeader := &EntryPrimaryHeader{
 			TotalSize:           33452341,
 			CommitTime:          345343452345,
@@ -19,21 +19,44 @@ var _ = Describe("EntrySerializer", func() {
 		}
 
 		serializedHeader := make([]byte, PrimaryHeaderSize)
-		WritePrimaryHeader(serializedHeader, testHeader)
-		deserializedHeader := ReadPrimaryHeader(serializedHeader)
+		SerializePrimaryHeader(serializedHeader, testHeader)
+		deserializedHeader := DeserializePrimaryHeader(serializedHeader)
 
 		Expect(*testHeader).To(Equal(*deserializedHeader))
 	})
 
-	It("Deserializes a header", func() {
+	It("Serializes and deserializes an entry", func() {
 		testEntry := Entry{
 			PrimaryHeader: &EntryPrimaryHeader{
+				UpdateTime:  54985934859843,
 				CommitTime:  23422523422343423,
 				KeyFormat:   DataFormat_UTF8,
 				ValueFormat: DataFormat_UTF8,
+				Flags:       Flag_TransactionEnd,
 			},
-			Key:   []byte(RandomWordString(60000)),
-			Value: []byte(RandomWordString(100000)),
+			SecondaryHeaderBytes: []byte{},
+			Key:                  []byte(RandomWordString(10)),
+			Value:                []byte(RandomWordString(50)),
+		}
+
+		serializedEntry := SerializeEntry(&testEntry)
+		deserializedEntry := DeserializeEntry(serializedEntry)
+
+		Expect(*deserializedEntry).To(EqualEntry(testEntry))
+	})
+
+	It("Serializes and deserializes an entry containing a secondary header", func() {
+		testEntry := Entry{
+			PrimaryHeader: &EntryPrimaryHeader{
+				UpdateTime:  54985934859843,
+				CommitTime:  23422523422343423,
+				KeyFormat:   DataFormat_UTF8,
+				ValueFormat: DataFormat_UTF8,
+				Flags:       Flag_TransactionEnd,
+			},
+			SecondaryHeaderBytes: []byte(RandomWordString(20)),
+			Key:                  []byte(RandomWordString(10)),
+			Value:                []byte(RandomWordString(50)),
 		}
 
 		serializedEntry := SerializeEntry(&testEntry)

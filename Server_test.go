@@ -17,11 +17,11 @@ var _ = Describe("Server", func() {
 
 	getTestEntries := func() []Entry {
 		return []Entry{
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key1"`), []byte(`"Value1"`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key2"`), []byte(`"Value2"`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key3"`), []byte(`"Value3"`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key4"`), []byte(`"Value4"`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key5"`), []byte(`"Value5"`)},
+			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte{}, []byte(`"Key1"`), []byte(`"Value1"`)},
+			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte{}, []byte(`"Key2"`), []byte(`"Value2"`)},
+			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte{}, []byte(`"Key3"`), []byte(`"Value3"`)},
+			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte{}, []byte(`"Key4"`), []byte(`"Value4"`)},
+			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte{}, []byte(`"Key5"`), []byte(`"Value5"`)},
 		}
 	}
 

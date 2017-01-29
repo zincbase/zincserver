@@ -8,11 +8,12 @@ import (
 
 func EqualEntry(expected Entry) GomegaMatcher {
 	return SatisfyAll(
-		BeAssignableToTypeOf(Entry{nil, []byte{}, []byte{}}),
-		MatchAllFields(Fields {
-			"PrimaryHeader": Equal(expected.PrimaryHeader),
-			"Key": Equal(expected.Key),
-			"Value": Equal(expected.Value),
+		BeAssignableToTypeOf(Entry{nil, nil, []byte{}, []byte{}}),
+		MatchAllFields(Fields{
+			"PrimaryHeader":   Equal(expected.PrimaryHeader),
+			"SecondaryHeaderBytes": Equal(expected.SecondaryHeaderBytes),
+			"Key":             Equal(expected.Key),
+			"Value":           Equal(expected.Value),
 		}),
 	)
 }

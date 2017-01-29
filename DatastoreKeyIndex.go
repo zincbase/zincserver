@@ -53,14 +53,12 @@ func SHA1(data []byte) string {
 	return string(hash.Sum(data))
 }
 
-func (this *DatastoreKeyIndex) GetCompactedRanges(readOffset int64, consolidate bool) RangeArray {
-	compactedRanges := RangeArray{}
+func (this *DatastoreKeyIndex) GetCompactedRanges(readOffset int64, consolidate bool) RangeList {
+	compactedRanges := RangeList{}
 
 	for _, currentRange := range this.keyIndex {
-		if currentRange.endOffset <= readOffset {
+		if currentRange.EndOffset <= readOffset || currentRange.StartOffset < readOffset {
 			continue
-		} else if currentRange.startOffset < readOffset {
-			currentRange.startOffset = readOffset
 		}
 
 		compactedRanges = append(compactedRanges, currentRange)
@@ -69,17 +67,17 @@ func (this *DatastoreKeyIndex) GetCompactedRanges(readOffset int64, consolidate 
 	sort.Sort(compactedRanges)
 
 	if consolidate {
-		consolidatedRanges := RangeArray{}
+		consolidatedRanges := RangeList{}
 		for _, currentRange := range compactedRanges {
 			currentLength := len(consolidatedRanges)
 
-			if currentLength > 0 && currentRange.startOffset == consolidatedRanges[currentLength-1].endOffset {
-				consolidatedRanges[currentLength-1].endOffset = currentRange.endOffset
+			if currentLength > 0 && currentRange.StartOffset == consolidatedRanges[currentLength-1].EndOffset {
+				consolidatedRanges[currentLength-1].EndOffset = currentRange.EndOffset
 			} else {
 				consolidatedRanges = append(consolidatedRanges, currentRange)
 			}
 		}
-		
+
 		compactedRanges = consolidatedRanges
 	}
 
@@ -90,7 +88,7 @@ func (this *DatastoreKeyIndex) GetCompactedSize() (compactedSize int64) {
 	compactedSize = 0
 
 	for _, entry := range this.keyIndex {
-		compactedSize += entry.endOffset - entry.startOffset
+		compactedSize += entry.EndOffset - entry.StartOffset
 	}
 
 	return
@@ -110,18 +108,4 @@ func (this *DatastoreKeyIndex) CompactToBuffer(entryStream io.ReaderAt, startOff
 
 	result = memoryWriter.WrittenData()
 	return
-}
-
-type RangeArray []Range
-
-func (this RangeArray) Less(a, b int) bool {
-	return this[a].startOffset < this[b].startOffset
-}
-
-func (this RangeArray) Swap(a, b int) {
-	this[a], this[b] = this[b], this[a]
-}
-
-func (this RangeArray) Len() int {
-	return len(this)
 }

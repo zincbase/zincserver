@@ -1,10 +1,11 @@
 package main
 
 import (
-    . "github.com/onsi/ginkgo"
-    . "github.com/onsi/gomega"
 	"log"
 	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Server", func() {
@@ -62,9 +63,9 @@ var _ = Describe("Server", func() {
 		log.Println(returnedEntries)
 		log.Println(testEntries[0:2])
 
-		ExpectEntryArraysToBeEqual(returnedEntries[1:], testEntries[0:2]);
+		ExpectEntryArraysToBeEqual(returnedEntries[1:], testEntries[0:2])
 
-		Expect(returnedEntries[0].PrimaryHeader.Flags&Flag_CreationEvent).To(Equal(Flag_CreationEvent))
+		Expect(returnedEntries[0].PrimaryHeader.Flags & Flag_CreationEvent).To(Equal(Flag_CreationEvent))
 		Expect(returnedEntries[0].Key).To(HaveLen(0))
 		Expect(returnedEntries[0].Value).To(HaveLen(0))
 	})
@@ -79,18 +80,18 @@ var _ = Describe("Server", func() {
 		setEntryTimestamps(testEntries[0:2], commitTimestamp)
 
 		commitTimestamp, err = client.Post(testEntries[2:5])
-		Expect(err).To(BeNil())		
+		Expect(err).To(BeNil())
 		Expect(commitTimestamp).ToNot(BeNil())
-		Expect(commitTimestamp).To(BeNumerically(">", 0))		
+		Expect(commitTimestamp).To(BeNumerically(">", 0))
 
 		setEntryTimestamps(testEntries[2:5], commitTimestamp)
 
 		returnedEntries, err := client.Get(0)
-		
+
 		Expect(err).To(BeNil())
 		ExpectEntryArraysToBeEqual(returnedEntries[1:], testEntries[0:5])
 
-		Expect(returnedEntries[0].PrimaryHeader.Flags&Flag_CreationEvent).To(Equal(Flag_CreationEvent))
+		Expect(returnedEntries[0].PrimaryHeader.Flags & Flag_CreationEvent).To(Equal(Flag_CreationEvent))
 		Expect(returnedEntries[0].Key).To(HaveLen(0))
 		Expect(returnedEntries[0].Value).To(HaveLen(0))
 	})
@@ -105,15 +106,15 @@ var _ = Describe("Server", func() {
 		setEntryTimestamps(testEntries[0:2], commitTimestamp)
 
 		commitTimestamp, err = client.Post(testEntries[2:5])
-		Expect(err).To(BeNil())		
+		Expect(err).To(BeNil())
 		Expect(commitTimestamp).ToNot(BeNil())
-		Expect(commitTimestamp).To(BeNumerically(">", 0))		
+		Expect(commitTimestamp).To(BeNumerically(">", 0))
 
 		setEntryTimestamps(testEntries[2:5], commitTimestamp)
 
 		returnedEntries, err := client.Get(commitTimestamp - 1)
 
-		Expect(err).To(BeNil())		
+		Expect(err).To(BeNil())
 		ExpectEntryArraysToBeEqual(returnedEntries, testEntries[2:5])
-	})	
+	})
 })

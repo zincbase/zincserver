@@ -66,7 +66,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 
 	// Create index
 	this.index = NewDatastoreIndex()
-	err = this.index.AppendFromReader(NewPrefetchingReaderAt(this.file), 0, fileSize)
+	err = this.index.AddFromEntryStream(NewPrefetchingReaderAt(this.file), 0, fileSize)
 
 	if err != nil {
 		// Check if file ends unexpectedly, or last entry does not include a transaction end marker
@@ -114,7 +114,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 
 		// Recreate index
 		this.index = NewDatastoreIndex()
-		err = this.index.AppendFromReader(this.file, 0, fileSize)
+		err = this.index.AddFromEntryStream(this.file, 0, fileSize)
 
 		if err != nil {
 			this.Release()
@@ -165,13 +165,13 @@ func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64, compact b
 
 	if compact {
 		keyIndex := NewDatastoreKeyIndex()
-		keyIndex.AddFromEntryStream(NewPrefetchingReaderAt(this.file), offset, int64(this.index.totalSize))
+		keyIndex.AddFromEntryStream(NewPrefetchingReaderAt(this.file), offset, int64(this.index.TotalSize))
 
 		reader = keyIndex.CreateReaderForCompactedRanges(this.file, offset)
 		readSize = keyIndex.GetCompactedSize()
 	} else {
-		reader = NewRangeReader(this.file, offset, int64(this.index.totalSize))
-		readSize = this.index.totalSize - offset
+		reader = NewRangeReader(this.file, offset, int64(this.index.TotalSize))
+		readSize = this.index.TotalSize - offset
 	}
 
 	return
@@ -189,13 +189,13 @@ func (this *DatastoreOperationsEntry) CreateIterator(updatedAfter int64, compact
 
 	if compact {
 		keyIndex := NewDatastoreKeyIndex()
-		keyIndex.AddFromEntryStream(this.file, offset, int64(this.index.totalSize))
+		keyIndex.AddFromEntryStream(this.file, offset, int64(this.index.TotalSize))
 		compactedRanges := keyIndex.GetCompactedRanges(0, false)
 		iteratorFunc = NewEntryRangeListIterator(NewPrefetchingReaderAt(this.file), compactedRanges, false)
 		readSize = keyIndex.GetCompactedSize()
 	} else {
-		iteratorFunc = NewEntryStreamIterator(NewPrefetchingReaderAt(this.file), offset, this.index.totalSize, false)
-		readSize = this.index.totalSize - offset
+		iteratorFunc = NewEntryStreamIterator(NewPrefetchingReaderAt(this.file), offset, this.index.TotalSize, false)
+		readSize = this.index.TotalSize - offset
 	}
 
 	return
@@ -216,7 +216,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 	// Check size limits
 	datastoreSizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxSize']")
 
-	if datastoreSizeLimit > 0 && this.index.totalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
+	if datastoreSizeLimit > 0 && this.index.TotalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
 		return 0, DatastoreTooLargeErr{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
 
@@ -242,7 +242,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 	}
 
 	// Write the transaction to the file
-	_, err = this.file.WriteAt(transactionBytes, int64(this.index.totalSize))
+	_, err = this.file.WriteAt(transactionBytes, int64(this.index.TotalSize))
 	if err != nil {
 		return
 	}
@@ -392,7 +392,7 @@ func (this *DatastoreOperationsEntry) GetUpdatedDataCache(entryStreamReader io.R
 func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 	startTime := MonoUnixTimeMilli()
 
-	currentSize := this.index.totalSize
+	currentSize := this.index.TotalSize
 
 	// Read configuration options for compaction
 	compactionEnabled, _ := this.GetBoolConfigValue("['datastore']['compaction']['enabled']")
@@ -496,7 +496,7 @@ func (this *DatastoreOperationsEntry) loadCompactionStateIfNeeded() error {
 		}
 
 		// Address the case where the compaction state file is invalid
-		if this.compactionState.LastCompactionCheckSize > this.index.totalSize {
+		if this.compactionState.LastCompactionCheckSize > this.index.TotalSize {
 			this.resetCompactionState()
 		}
 
@@ -547,7 +547,7 @@ func (this *DatastoreOperationsEntry) Release() (err error) {
 	this.file = nil
 	this.index = nil
 	this.compactionState = nil
-	
+
 	// The cached data shouldn't be cleared here
 	// Otherwise configuration would become nil every time the datastore is rewritten
 	// or an error occurs:
@@ -603,7 +603,7 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 
 		// Try recreating journal index up to the truncated size
 		this.index = NewDatastoreIndex()
-		err = this.index.AppendFromReader(this.file, 0, truncatedSize)
+		err = this.index.AddFromEntryStream(this.file, 0, truncatedSize)
 
 		if err != nil {
 			this.parentServer.Log(fmt.Sprintf("Failed to recreate index for datastore '%s' after repair", this.name), 1)

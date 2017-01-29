@@ -12,11 +12,11 @@ type DatastoreIndexEntry struct {
 }
 
 type DatastoreIndex struct {
-	totalSize int64
-	entries   []DatastoreIndexEntry
+	TotalSize int64
+	Entries   []DatastoreIndexEntry
 }
 
-func (this *DatastoreIndex) AppendFromReader(source io.ReaderAt, startOffset int64, endOffset int64) error {
+func (this *DatastoreIndex) AddFromEntryStream(source io.ReaderAt, startOffset int64, endOffset int64) error {
 	next := NewEntryStreamIterator(source, startOffset, endOffset, true)
 
 	previousTimestamp := int64(0)
@@ -33,22 +33,22 @@ func (this *DatastoreIndex) AppendFromReader(source io.ReaderAt, startOffset int
 		}
 
 		if iteratorResult.PrimaryHeader.CommitTime > previousTimestamp {
-			this.entries = append(
-				this.entries,
-				DatastoreIndexEntry{this.totalSize, iteratorResult.PrimaryHeader.CommitTime})
+			this.Entries = append(
+				this.Entries,
+				DatastoreIndexEntry{this.TotalSize, iteratorResult.PrimaryHeader.CommitTime})
 		}
 
 		previousTimestamp = iteratorResult.PrimaryHeader.CommitTime
-		this.totalSize += iteratorResult.Size
+		this.TotalSize += iteratorResult.Size
 	}
 }
 
 func (this *DatastoreIndex) AppendFromBuffer(entryStreamBuffer []byte) error {
-	return this.AppendFromReader(bytes.NewReader(entryStreamBuffer), 0, int64(len(entryStreamBuffer)))
+	return this.AddFromEntryStream(bytes.NewReader(entryStreamBuffer), 0, int64(len(entryStreamBuffer)))
 }
 
 func (this *DatastoreIndex) FindOffsetOfFirstEntryUpdatedAfter(lowerBoundingTimestamp int64) int64 {
-	for _, entry := range this.entries {
+	for _, entry := range this.Entries {
 		if entry.timestamp > lowerBoundingTimestamp {
 			return entry.offset
 		}
@@ -58,24 +58,16 @@ func (this *DatastoreIndex) FindOffsetOfFirstEntryUpdatedAfter(lowerBoundingTime
 }
 
 func (this *DatastoreIndex) LatestUpdateTimestamp() int64 {
-	if len(this.entries) == 0 {
+	if len(this.Entries) == 0 {
 		return -1
 	}
 
-	return this.entries[len(this.entries)-1].timestamp
-}
-
-func (this *DatastoreIndex) LatestEntryOffset() int64 {
-	if len(this.entries) == 0 {
-		return 0
-	}
-
-	return this.entries[len(this.entries)-1].offset
+	return this.Entries[len(this.Entries)-1].timestamp
 }
 
 func NewDatastoreIndex() *DatastoreIndex {
 	return &DatastoreIndex{
-		totalSize: 0,
-		entries:   []DatastoreIndexEntry{},
+		TotalSize: 0,
+		Entries:   []DatastoreIndexEntry{},
 	}
 }

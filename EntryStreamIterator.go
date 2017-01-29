@@ -75,7 +75,7 @@ func NewEntryRangeListIterator(source io.ReaderAt, ranges []Range, checkTransact
 			}
 		}
 
-		readOffset := ranges[currentRangeIndex].startOffset
+		readOffset := ranges[currentRangeIndex].StartOffset
 		headerBytes := make([]byte, PrimaryHeaderSize)
 		_, err := source.ReadAt(headerBytes, readOffset)
 

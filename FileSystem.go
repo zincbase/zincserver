@@ -20,14 +20,14 @@ func ReplaceFileSafely(filePath string, newContentReader io.Reader) (err error) 
 	}
 
 	if fileExists {
-		err = RenameFile(filePath, oldFileName)
+		err = os.Rename(filePath, oldFileName)
 		if err != nil {
 			return
 		}
 	}
 
 	// Rename the temporary file to the target file
-	err = RenameFile(tempFileName, filePath)
+	err = os.Rename(tempFileName, filePath)
 	if err != nil {
 		return
 	}
@@ -45,7 +45,7 @@ func ReplaceFileSafely(filePath string, newContentReader io.Reader) (err error) 
 
 func DeleteFileSafely(filePath string) (err error) {
 	deletedFileName := fmt.Sprintf("%s.deleted-%d", filePath, MonoUnixTimeMicro())
-	err = RenameFile(filePath, deletedFileName)
+	err = os.Rename(filePath, deletedFileName)
 	if err != nil {
 		return
 	}

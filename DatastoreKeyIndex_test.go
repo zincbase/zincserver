@@ -40,18 +40,18 @@ var _ = Describe("DatastoreKeyIndex", func() {
 
 		result, exists := keyIndex.Get([]byte("Key0"))
 		Expect(exists).To(BeTrue())
-		Expect(result.StartOffset).To(Equal(int64(4444)))
-		Expect(result.EndOffset).To(Equal(int64(5555)))
+		Expect(result.StartOffset).To(EqualNumber(4444))
+		Expect(result.EndOffset).To(EqualNumber(5555))
 
 		result, exists = keyIndex.Get([]byte("Key1"))
 		Expect(exists).To(BeTrue())
-		Expect(result.StartOffset).To(Equal(int64(5555)))
-		Expect(result.EndOffset).To(Equal(int64(6666)))
+		Expect(result.StartOffset).To(EqualNumber(5555))
+		Expect(result.EndOffset).To(EqualNumber(6666))
 
 		result, exists = keyIndex.Get([]byte("Key2"))
 		Expect(exists).To(BeFalse())
-		Expect(result.StartOffset).To(Equal(int64(0)))
-		Expect(result.EndOffset).To(Equal(int64(0)))
+		Expect(result.StartOffset).To(EqualNumber(0))
+		Expect(result.EndOffset).To(EqualNumber(0))
 	})
 
 	It("Indexes a stream of entries by key", func() {
@@ -88,7 +88,7 @@ var _ = Describe("DatastoreKeyIndex", func() {
 		keyIndex := NewDatastoreKeyIndex()
 		keyIndex.AddFromEntryStream(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
 
-		Expect(int(keyIndex.GetCompactedSize())).To(Equal(len(serializedEntries[3]) + len(serializedEntries[4]) + len(serializedEntries[6])))
+		Expect(keyIndex.GetCompactedSize()).To(EqualNumber(len(serializedEntries[3]) + len(serializedEntries[4]) + len(serializedEntries[6])))
 	})
 
 	It("Calculates compacted ranges", func() {
@@ -97,14 +97,14 @@ var _ = Describe("DatastoreKeyIndex", func() {
 
 		compactedRanges := keyIndex.GetCompactedRanges(0, false)
 		Expect(len(compactedRanges)).To(Equal(3))
-		Expect(compactedRanges[0].StartOffset).To(Equal(int64(serializedEntryOffsets[3])))
-		Expect(compactedRanges[0].EndOffset).To(Equal(int64(serializedEntryOffsets[4])))
+		Expect(compactedRanges[0].StartOffset).To(EqualNumber(serializedEntryOffsets[3]))
+		Expect(compactedRanges[0].EndOffset).To(EqualNumber(serializedEntryOffsets[4]))
 
-		Expect(compactedRanges[1].StartOffset).To(Equal(int64(serializedEntryOffsets[4])))
-		Expect(compactedRanges[1].EndOffset).To(Equal(int64(serializedEntryOffsets[5])))
+		Expect(compactedRanges[1].StartOffset).To(EqualNumber(serializedEntryOffsets[4]))
+		Expect(compactedRanges[1].EndOffset).To(EqualNumber(serializedEntryOffsets[5]))
 
-		Expect(compactedRanges[2].StartOffset).To(Equal(int64(serializedEntryOffsets[6])))
-		Expect(compactedRanges[2].EndOffset).To(Equal(int64(len(entryStream))))
+		Expect(compactedRanges[2].StartOffset).To(EqualNumber(serializedEntryOffsets[6]))
+		Expect(compactedRanges[2].EndOffset).To(EqualNumber(len(entryStream)))
 	})
 
 	It("Calculates compacted ranges", func() {
@@ -113,14 +113,14 @@ var _ = Describe("DatastoreKeyIndex", func() {
 
 		compactedRanges := keyIndex.GetCompactedRanges(0, false)
 		Expect(len(compactedRanges)).To(Equal(3))
-		Expect(compactedRanges[0].StartOffset).To(Equal(int64(serializedEntryOffsets[3])))
-		Expect(compactedRanges[0].EndOffset).To(Equal(int64(serializedEntryOffsets[4])))
+		Expect(compactedRanges[0].StartOffset).To(EqualNumber(serializedEntryOffsets[3]))
+		Expect(compactedRanges[0].EndOffset).To(EqualNumber(serializedEntryOffsets[4]))
 
-		Expect(compactedRanges[1].StartOffset).To(Equal(int64(serializedEntryOffsets[4])))
-		Expect(compactedRanges[1].EndOffset).To(Equal(int64(serializedEntryOffsets[5])))
+		Expect(compactedRanges[1].StartOffset).To(EqualNumber(serializedEntryOffsets[4]))
+		Expect(compactedRanges[1].EndOffset).To(EqualNumber(serializedEntryOffsets[5]))
 
-		Expect(compactedRanges[2].StartOffset).To(Equal(int64(serializedEntryOffsets[6])))
-		Expect(compactedRanges[2].EndOffset).To(Equal(int64(len(entryStream))))
+		Expect(compactedRanges[2].StartOffset).To(EqualNumber(serializedEntryOffsets[6]))
+		Expect(compactedRanges[2].EndOffset).To(EqualNumber(len(entryStream)))
 	})
 
 	It("Calculates consolidated compacted ranges", func() {
@@ -129,11 +129,11 @@ var _ = Describe("DatastoreKeyIndex", func() {
 
 		compactedRanges := keyIndex.GetCompactedRanges(0, true)
 		Expect(len(compactedRanges)).To(Equal(2))
-		Expect(compactedRanges[0].StartOffset).To(Equal(int64(serializedEntryOffsets[3])))
-		Expect(compactedRanges[0].EndOffset).To(Equal(int64(serializedEntryOffsets[5])))
+		Expect(compactedRanges[0].StartOffset).To(EqualNumber(serializedEntryOffsets[3]))
+		Expect(compactedRanges[0].EndOffset).To(EqualNumber(serializedEntryOffsets[5]))
 
-		Expect(compactedRanges[1].StartOffset).To(Equal(int64(serializedEntryOffsets[6])))
-		Expect(compactedRanges[1].EndOffset).To(Equal(int64(len(entryStream))))
+		Expect(compactedRanges[1].StartOffset).To(EqualNumber(serializedEntryOffsets[6]))
+		Expect(compactedRanges[1].EndOffset).To(EqualNumber(len(entryStream)))
 	})
 
 	It("Calculates compacted ranges from a starting offset", func() {
@@ -142,10 +142,10 @@ var _ = Describe("DatastoreKeyIndex", func() {
 
 		compactedRanges := keyIndex.GetCompactedRanges(serializedEntryOffsets[4], false)
 		Expect(len(compactedRanges)).To(Equal(2))
-		Expect(compactedRanges[0].StartOffset).To(Equal(int64(serializedEntryOffsets[4])))
-		Expect(compactedRanges[0].EndOffset).To(Equal(int64(serializedEntryOffsets[5])))
+		Expect(compactedRanges[0].StartOffset).To(EqualNumber(serializedEntryOffsets[4]))
+		Expect(compactedRanges[0].EndOffset).To(EqualNumber(serializedEntryOffsets[5]))
 
-		Expect(compactedRanges[1].StartOffset).To(Equal(int64(serializedEntryOffsets[6])))
-		Expect(compactedRanges[1].EndOffset).To(Equal(int64(len(entryStream))))
+		Expect(compactedRanges[1].StartOffset).To(EqualNumber(serializedEntryOffsets[6]))
+		Expect(compactedRanges[1].EndOffset).To(EqualNumber(len(entryStream)))
 	})
 })

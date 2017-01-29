@@ -1,10 +1,8 @@
 package main
 
 import (
-    . "github.com/onsi/ginkgo"
-    . "github.com/onsi/gomega"	
-	. "github.com/onsi/gomega/gstruct"
-	"github.com/onsi/gomega/types"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("EntrySerializer", func() {
@@ -22,13 +20,13 @@ var _ = Describe("EntrySerializer", func() {
 
 		serializedHeader := make([]byte, PrimaryHeaderSize)
 		WritePrimaryHeader(serializedHeader, testHeader)
-		deserializedHeader := ReadPrimaryHeader(serializedHeader)	
+		deserializedHeader := ReadPrimaryHeader(serializedHeader)
 
 		Expect(*testHeader).To(Equal(*deserializedHeader))
 	})
 
 	It("Deserializes a header", func() {
-		testEntry := Entry {
+		testEntry := Entry{
 			PrimaryHeader: &EntryPrimaryHeader{
 				CommitTime:  23422523422343423,
 				KeyFormat:   DataFormat_UTF8,
@@ -44,24 +42,3 @@ var _ = Describe("EntrySerializer", func() {
 		Expect(*deserializedEntry).To(EqualEntry(testEntry))
 	})
 })
-
-func EqualEntry(expected Entry) types.GomegaMatcher {
-	return SatisfyAll(
-		BeAssignableToTypeOf(Entry{nil, []byte{}, []byte{}}),
-		MatchAllFields(Fields {
-			"PrimaryHeader": Equal(expected.PrimaryHeader),
-			"Key": Equal(expected.Key),
-			"Value": Equal(expected.Value),
-		}),
-	)
-}
-
-func ExpectEntryArraysToBeEqual(entries1 []Entry, entries2 []Entry) bool {
-	Expect(entries1).To(HaveLen(len(entries2)))
-
-	for i := 0; i < len(entries1); i++ {
-		Expect(entries1[i]).To(EqualEntry(entries2[i]))
-	}
-
-	return true
-}

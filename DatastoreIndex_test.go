@@ -65,16 +65,16 @@ var _ = Describe("DatastoreIndex", func() {
 
 		Expect(err).To(BeNil())
 
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(0))).To(Equal(0))
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(1))).To(Equal(0))
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(2))).To(Equal(len(serializedEntries[0])))
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(3))).To(Equal(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2])))
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(4))).To(Equal(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2])))
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(5))).To(Equal(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2])))
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(6))).To(Equal(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2])))
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(7))).To(Equal(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2]) + len(serializedEntries[3]) + len(serializedEntries[4])))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(0)).To(EqualNumber(0))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(1)).To(EqualNumber(0))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(2)).To(EqualNumber(len(serializedEntries[0])))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(3)).To(EqualNumber(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2])))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(4)).To(EqualNumber(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2])))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(5)).To(EqualNumber(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2])))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(6)).To(EqualNumber(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2])))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(7)).To(EqualNumber(len(serializedEntries[0]) + len(serializedEntries[1]) + len(serializedEntries[2]) + len(serializedEntries[3]) + len(serializedEntries[4])))
 
-		Expect(int(index.FindOffsetOfFirstEntryUpdatedAfter(13))).To(Equal(-1))
+		Expect(index.FindOffsetOfFirstEntryUpdatedAfter(13)).To(EqualNumber(-1))
 	})
 
 	It("Gives the latest updated timestamp", func() {
@@ -93,7 +93,7 @@ var _ = Describe("DatastoreIndex", func() {
 		serializedEntries := make([][]byte, len(testEntries))
 		for i, entry := range testEntries {
 			serializedEntries[i] = SerializeEntry(entry)
-		}		
+		}
 
 		for i, _ := range serializedEntries {
 			err := index.AddFromEntryStream(bytes.NewReader(serializedEntries[i]), 0, int64(len(serializedEntries[i])))

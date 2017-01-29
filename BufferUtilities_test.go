@@ -1,8 +1,8 @@
 package main
 
 import (
-    . "github.com/onsi/ginkgo"
-    . "github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("BufferUtilities", func() {
@@ -26,9 +26,9 @@ var _ = Describe("BufferUtilities", func() {
 
 	It("Clones a buffer", func() {
 		Expect(CloneBuffer([]byte{1, 2, 3, 4})).To(Equal([]byte{1, 2, 3, 4}))
-	})	
+	})
 
 	It("Clones an empty buffer", func() {
 		Expect(CloneBuffer([]byte{})).To(Equal([]byte{}))
-	})	
+	})
 })

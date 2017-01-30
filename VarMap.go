@@ -124,7 +124,6 @@ func (this *VarMap) GetFirstMatchFloat64(keys ...string) (float64, error) {
 	return 0, ErrNotFound
 }
 
-
 func (this *VarMap) GetAny(key string) (interface{}, error) {
 	val, exists := this.entries[key]
 	if !exists {
@@ -183,8 +182,9 @@ func (this *VarMap) FindKeysStartingWith(prefix string) (results []string) {
 }
 */
 
-func (this *VarMap) Has(key string) bool{
-	return this.entries[key] != nil
+func (this *VarMap) Has(key string) bool {
+	_, ok := this.entries[key]
+	return ok
 }
 
 func (this *VarMap) Keys() (results []string) {

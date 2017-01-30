@@ -1,5 +1,3 @@
-// +build amd64 386 arm arm64 ppc64le mips64le
-
 package main
 
 import (
@@ -7,7 +5,6 @@ import (
 	"errors"
 	//"strconv"
 	"io"
-	"unsafe"
 )
 
 const PrimaryHeaderSize = 32
@@ -59,33 +56,30 @@ func SerializeEntries(entries []Entry) []byte {
 }
 
 func SerializeEntry(entry *Entry) (serializedEntry []byte) {
+	// Calculate sizes of the entry's components
 	secondaryHeaderSize := uint16(len(entry.SecondaryHeaderBytes))
 	keySize := uint16(len(entry.Key))
 	valueSize := int64(len(entry.Value))
 	totalSize := int64(PrimaryHeaderSize + int(secondaryHeaderSize) + int(keySize) + int(valueSize))
 
-	timestamp := MonoUnixTimeMicro()
-
+	// Fill out the primary header fields if needed
 	if entry.PrimaryHeader == nil {
-		entry.PrimaryHeader = &EntryPrimaryHeader{
-			TotalSize:           totalSize,
-			UpdateTime:          timestamp,
-			KeySize:             keySize,
-			SecondaryHeaderSize: secondaryHeaderSize,
-		}
-	} else {
-		entry.PrimaryHeader.TotalSize = totalSize
-		if entry.PrimaryHeader.UpdateTime == 0 {
-			entry.PrimaryHeader.UpdateTime = timestamp
-		}
-		entry.PrimaryHeader.KeySize = keySize
-		entry.PrimaryHeader.SecondaryHeaderSize = secondaryHeaderSize
+		entry.PrimaryHeader = &EntryPrimaryHeader{}
 	}
 
+	entry.PrimaryHeader.TotalSize = totalSize
+	if entry.PrimaryHeader.UpdateTime == 0 {
+		entry.PrimaryHeader.UpdateTime = MonoUnixTimeMicro()
+	}
+	entry.PrimaryHeader.KeySize = keySize
+	entry.PrimaryHeader.SecondaryHeaderSize = secondaryHeaderSize
+
+	// Calculate offsets
 	secondaryHeaderOffset := PrimaryHeaderSize
 	keyOffset := int64(secondaryHeaderOffset) + int64(secondaryHeaderSize)
 	valueOffset := keyOffset + int64(keySize)
 
+	// Build the serialized entry
 	serializedEntry = make([]byte, totalSize)
 
 	SerializePrimaryHeader(serializedEntry[0:secondaryHeaderOffset], entry.PrimaryHeader)
@@ -94,10 +88,6 @@ func SerializeEntry(entry *Entry) (serializedEntry []byte) {
 	copy(serializedEntry[valueOffset:], entry.Value)
 
 	return
-}
-
-func SerializePrimaryHeader(targetSlice []byte, header *EntryPrimaryHeader) {
-	*(*EntryPrimaryHeader)(unsafe.Pointer(&targetSlice[0])) = *header
 }
 
 func SerializeJsonEntries(jsonEntries []JsonEntry) []byte {
@@ -177,10 +167,6 @@ func DeserializePrimaryHeaderAndRemainderBytes(primaryHeaderBytes []byte, remain
 		Key:                  remainderBytes[keyOffset:valueOffset],
 		Value:                remainderBytes[valueOffset:],
 	}
-}
-
-func DeserializePrimaryHeader(primaryHeaderBytes []byte) *EntryPrimaryHeader {
-	return (*EntryPrimaryHeader)(unsafe.Pointer(&primaryHeaderBytes[0]))
 }
 
 func DeserializeEntryStreamReaderAndAppendToVarMap(source io.ReaderAt, startOffset int64, endOffset int64, target *VarMap) (err error) {

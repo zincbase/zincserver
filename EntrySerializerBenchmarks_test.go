@@ -7,11 +7,13 @@ import (
 func Benchmark_EntrySerializer(bench *testing.B) {
 	bench.Run("Serialization", func(bench *testing.B) {
 		testEntry := Entry{
-			Key:   []byte("Test Key"),
-			Value: []byte("Test Value"),
 			PrimaryHeader: &EntryPrimaryHeader{
+				UpdateTime: 2345345222523423132,
 				CommitTime: 2345345222523423423,
 			},
+			SecondaryHeaderBytes: []byte("Secondary Header"),
+			Key:                  []byte("Test Key"),
+			Value:                []byte("Test Value"),
 		}
 
 		bench.ResetTimer()
@@ -22,11 +24,13 @@ func Benchmark_EntrySerializer(bench *testing.B) {
 
 	bench.Run("Deserialization", func(bench *testing.B) {
 		testEntry := Entry{
-			Key:   []byte("Test Key"),
-			Value: []byte("Test Value"),
 			PrimaryHeader: &EntryPrimaryHeader{
+				UpdateTime: 2345345222523423132,
 				CommitTime: 2345345222523423423,
 			},
+			SecondaryHeaderBytes: []byte("Secondary Header"),
+			Key:                  []byte("Test Key"),
+			Value:                []byte("Test Value"),
 		}
 
 		serializedTestEntry := SerializeEntry(&testEntry)

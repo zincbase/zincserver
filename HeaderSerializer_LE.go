@@ -1,0 +1,25 @@
+// +build amd64 386 arm arm64 ppc64le mips64le
+
+package main
+
+import (
+	"unsafe"
+)
+
+// Native implementations for little endian platforms
+
+////////////////////////////////////////////////////////////////////////////////
+// Serialization
+////////////////////////////////////////////////////////////////////////////////
+
+func SerializePrimaryHeader(targetSlice []byte, header *EntryPrimaryHeader) {
+	*(*EntryPrimaryHeader)(unsafe.Pointer(&targetSlice[0])) = *header
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Deserialization
+////////////////////////////////////////////////////////////////////////////////
+
+func DeserializePrimaryHeader(primaryHeaderBytes []byte) *EntryPrimaryHeader {
+	return (*EntryPrimaryHeader)(unsafe.Pointer(&primaryHeaderBytes[0]))
+}

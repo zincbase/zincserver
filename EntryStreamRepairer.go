@@ -20,8 +20,7 @@ func FindSafeTruncationSize(source io.ReaderAt, endOffset int64) (truncatedSize 
 			}
 		}
 
-		if previousIteratorResult != nil &&
-			previousIteratorResult.HasTransactionEndFlag() {
+		if previousIteratorResult != nil && previousIteratorResult.HasTransactionEndFlag() {
 			truncatedSize = previousIteratorResult.Offset + previousIteratorResult.Size
 		}
 

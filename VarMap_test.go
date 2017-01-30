@@ -42,12 +42,20 @@ var _ = Describe("VarMap", func() {
 		Expect(result4).To(Equal(float64(345345.453234)))
 	})
 
-	It("Checks for existence of keys", func() {
+	It("Checks for the existence of keys", func() {
 		varMap := NewEmptyVarMap()
 		varMap.Set("Hello", "World")
 		varMap.Set("Hi", float64(345345.453234))
 
 		Expect(varMap.Has("Hello")).To(BeTrue())
+		Expect(varMap.Has("Hi")).To(BeTrue())
+		Expect(varMap.Has("Da")).To(BeFalse())
+	})
+
+	It("Checks for the existence of keys with nil values", func() {
+		varMap := NewEmptyVarMap()
+		varMap.Set("Hi", nil)
+
 		Expect(varMap.Has("Hi")).To(BeTrue())
 		Expect(varMap.Has("Da")).To(BeFalse())
 	})

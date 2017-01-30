@@ -8,7 +8,7 @@ The software is mostly feature complete, but still at an alpha level of stabilit
 
 ## Platform support
 
-Currently only tested on Linux and Windows. Might build on other platforms as well. Big endian targets are not supported yet, but may be in the future.
+Currently only tested on Linux and Windows. Might also work on other platform/architecture combinations supported by the Go runtime (including big endian).
 
 ## Documentation
 

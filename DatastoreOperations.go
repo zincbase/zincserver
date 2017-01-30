@@ -177,30 +177,6 @@ func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64, compact b
 	return
 }
 
-func (this *DatastoreOperationsEntry) CreateIterator(updatedAfter int64, compact bool) (iteratorFunc EntryStreamIteratorFunc, readSize int64, err error) {
-	if this.file == nil {
-		return nil, 0, DatastoreNotOpenErr
-	}
-
-	offset := this.index.FindOffsetOfFirstEntryUpdatedAfter(updatedAfter)
-	if offset == -1 {
-		return NewEntryStreamIterator(bytes.NewReader([]byte{}), 0, 0, false), 0, nil
-	}
-
-	if compact {
-		keyIndex := NewDatastoreKeyIndex()
-		keyIndex.AddFromEntryStream(this.file, offset, int64(this.index.TotalSize))
-		compactedRanges := keyIndex.GetCompactedRanges(0, false)
-		iteratorFunc = NewEntryRangeListIterator(NewPrefetchingReaderAt(this.file), compactedRanges, false)
-		readSize = keyIndex.GetCompactedSize()
-	} else {
-		iteratorFunc = NewEntryStreamIterator(NewPrefetchingReaderAt(this.file), offset, this.index.TotalSize, false)
-		readSize = this.index.TotalSize - offset
-	}
-
-	return
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Write operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////

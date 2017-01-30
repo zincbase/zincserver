@@ -56,55 +56,6 @@ func NewEntryStreamIterator(source io.ReaderAt, startOffset int64, endOffset int
 	}
 }
 
-func NewEntryRangeListIterator(source io.ReaderAt, ranges []Range, checkTransactionEndFlag bool) EntryStreamIteratorFunc {
-	if len(ranges) == 0 {
-		return func() (*EntryStreamIteratorResult, error) {
-			return nil, nil
-		}
-	}
-
-	var currentRangeIndex = 0
-	var lastEntryHadTransactionEndFlag bool
-
-	return func() (*EntryStreamIteratorResult, error) {
-		if currentRangeIndex == len(ranges) {
-			if checkTransactionEndFlag && !lastEntryHadTransactionEndFlag {
-				return nil, io.ErrUnexpectedEOF
-			} else {
-				return nil, nil
-			}
-		}
-
-		readOffset := ranges[currentRangeIndex].StartOffset
-		headerBytes := make([]byte, PrimaryHeaderSize)
-		_, err := source.ReadAt(headerBytes, readOffset)
-
-		if err != nil {
-			if err == io.EOF {
-				return nil, io.ErrUnexpectedEOF
-			} else {
-				return nil, err
-			}
-		}
-
-		header := DeserializePrimaryHeader(headerBytes)
-
-		iteratorResult := &EntryStreamIteratorResult{
-			source:        source,
-			Offset:        readOffset,
-			Size:          header.TotalSize,
-			PrimaryHeader: header,
-		}
-
-		if checkTransactionEndFlag {
-			lastEntryHadTransactionEndFlag = iteratorResult.HasTransactionEndFlag()
-		}
-
-		currentRangeIndex++
-		return iteratorResult, nil
-	}
-}
-
 type EntryStreamIteratorResult struct {
 	source        io.ReaderAt
 	Offset        int64

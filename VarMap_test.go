@@ -58,6 +58,9 @@ var _ = Describe("VarMap", func() {
 
 		Expect(varMap.Has("Hi")).To(BeTrue())
 		Expect(varMap.Has("Da")).To(BeFalse())
+
+		varMap.Delete("Hi")
+		Expect(varMap.Has("Hi")).To(BeFalse())
 	})
 
 	It("Appends JSON entries", func() {

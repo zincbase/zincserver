@@ -34,6 +34,13 @@ func MaxFloat64(a, b float64) float64 {
 	return a
 }
 
+func RandomBytes(length int) (result []byte) {
+	random := rand.New(rand.NewSource(MonoUnixTimeNano()))
+	result = make([]byte, length)
+	random.Read(result)
+	return result;
+}
+
 func RandomWordString(length int) string {
 
 	letters := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

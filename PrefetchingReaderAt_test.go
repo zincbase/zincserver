@@ -11,7 +11,7 @@ import (
 
 var _ = Describe("PrefetchingReaderAt", func() {
 	It("Reads from a short slice of bytes", func() {
-		randomBytes := []byte(RandomWordString(100))
+		randomBytes := RandomBytes(100)
 
 		reader := NewPrefetchingReaderAt(bytes.NewReader(randomBytes))
 
@@ -45,7 +45,7 @@ var _ = Describe("PrefetchingReaderAt", func() {
 	})
 
 	It("Reads from a long (> 32768 characters) slice of bytes", func() {
-		randomBytes := []byte(RandomWordString(100000))
+		randomBytes := RandomBytes(100000)
 		reader := NewPrefetchingReaderAt(bytes.NewReader(randomBytes))
 
 		//
@@ -82,7 +82,7 @@ var _ = Describe("PrefetchingReaderAt", func() {
 	})
 
 	It("Reads random slices of random lengths from a long (> 32768 characters) slice of bytes", func() {	
-		randomBytes := []byte(RandomWordString(100000))
+		randomBytes := RandomBytes(100000)
 		reader := NewPrefetchingReaderAt(bytes.NewReader(randomBytes))		
 
 		random := rand.New(rand.NewSource(0))

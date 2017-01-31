@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"math/rand"
 )
 
 func GenerateRandomDatastore(filePath string, entryCount int, keySize int, valueSize int, entryType string) (err error) {
@@ -65,15 +64,9 @@ func getRandomUtf8Entry(keySize int, valueSize int) (result *Entry) {
 }
 
 func getRandomBinaryEntry(keySize int, valueSize int) (result *Entry) {
-	key := make([]byte, keySize)
-	rand.Read(key)
-
-	value := make([]byte, valueSize)
-	rand.Read(value)
-
 	result = &Entry{
-		Key:   key,
-		Value: value,
+		Key:   RandomBytes(keySize),
+		Value: RandomBytes(valueSize),
 		PrimaryHeader: &EntryPrimaryHeader{
 			UpdateTime:  MonoUnixTimeMicro(),
 			CommitTime:  MonoUnixTimeMicro(),
@@ -131,12 +124,9 @@ func getRandomPathEntry(keySize int, valueSize int) (result *Entry) {
 }
 
 func getRandomPathEntryWithBinaryValue(keySize int, valueSize int) (result *Entry) {
-	value := make([]byte, valueSize)
-	rand.Read(value)	
-	
 	result = &Entry{
 		Key:   []byte(`"['` + RandomWordString(keySize-6) + `']"`),
-		Value: value,
+		Value: RandomBytes(valueSize),
 		PrimaryHeader: &EntryPrimaryHeader{
 			UpdateTime:  MonoUnixTimeMicro(),
 			CommitTime:  MonoUnixTimeMicro(),

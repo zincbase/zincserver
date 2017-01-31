@@ -12,12 +12,12 @@ var _ = Describe("EntrySerializer", func() {
 				UpdateTime:  23422523422341542,
 				CommitTime:  23422523422343423,
 				KeyFormat:   DataFormat_UTF8,
-				ValueFormat: DataFormat_UTF8,
+				ValueFormat: DataFormat_Binary,
 				Flags:       Flag_TransactionEnd,
 			},
-			SecondaryHeaderBytes: []byte(RandomWordString(20)),
+			SecondaryHeaderBytes: []byte(RandomBytes(20)),
 			Key:                  []byte(RandomWordString(10)),
-			Value:                []byte(RandomWordString(50)),
+			Value:                []byte(RandomBytes(50)),
 		}
 
 		serializedEntry := SerializeEntry(&testEntry)

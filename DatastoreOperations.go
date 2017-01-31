@@ -439,7 +439,7 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 
 		// Acquire a lock for the flush
 		this.flushMutex.Lock()
-		
+
 		// Defer this lock to be released once the function has completed
 		defer this.flushMutex.Unlock()
 
@@ -798,14 +798,34 @@ func (this *DatastoreOperationsEntry) IsCached() bool {
 
 func (this *DatastoreOperationsEntry) GetColisionFreeTimestamp() (timestamp int64) {
 	timestamp = MonoUnixTimeMicro()
+
+	// If an index is not available, return with new timestamp
+	// This may happen if the datastore is being rewritten
 	if this.index == nil {
 		return
 	}
 
+	// Get the last modified time for the datastore
 	lastModifiedTime := this.LastModifiedTime()
 
-	// Spinwait, if needed, until new timestamp is strictly greater than previous one
-	for timestamp == lastModifiedTime {
+	// Check if timestamp is less than or equals last modified timestamp
+	if timestamp == lastModifiedTime { // If it equals exactly
+		// Spinwait, until the new timestamp is strictly greater than previous one
+		for timestamp == lastModifiedTime {
+			// Get new timestamp
+			timestamp = MonoUnixTimeMicro()
+		}
+	} else if timestamp < lastModifiedTime { // if it is strictly less than last modified time
+		// Calculate the needed sleep time
+		sleepTime := lastModifiedTime - timestamp + 1
+
+		// Log a message 
+		this.parentServer.Log(fmt.Sprintf("The last modification time of datastore '%s' is greater than current time. Sleeping for %dms until the anomaly is resolved..", this.name, sleepTime), 1)
+
+		// Sleep until timestamp is strictly greater than the last modification time
+		Sleep(sleepTime)
+
+		// Get new timestamp
 		timestamp = MonoUnixTimeMicro()
 	}
 

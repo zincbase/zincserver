@@ -39,7 +39,7 @@ func RandomBytes(length int) (result []byte) {
 	random := rand.New(rand.NewSource(MonoUnixTimeNano()))
 	result = make([]byte, length)
 	random.Read(result)
-	return result;
+	return result
 }
 
 func RandomWordString(length int) string {

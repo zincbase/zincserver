@@ -4,6 +4,7 @@ import (
 	"os"
 	"sync"
 	_ "log"
+	"errors"
 )
 
 type FileDescriptorCounterMap struct {
@@ -20,6 +21,7 @@ func init() {
 func (this *FileDescriptorCounterMap) OpenAndIncrement(name string, flag int, perm os.FileMode) (file *os.File, err error) {
 	this.Lock()
 	file, err = OpenFileWithDeleteSharing(name, flag, perm)
+
 	if err == nil {
 		this.counterMap[file.Fd()] = 1
 	}
@@ -29,25 +31,31 @@ func (this *FileDescriptorCounterMap) OpenAndIncrement(name string, flag int, pe
 	return
 }
 
-func (this *FileDescriptorCounterMap) Increment(file *os.File) {
+func (this *FileDescriptorCounterMap) Increment(file *os.File) error {
 	this.Lock()
+	defer this.Unlock()
+
 	fd := file.Fd()
 	//log.Printf("Increment %d", fd)
 
 	if this.counterMap[fd] == 0 {
-		panic("Attempt to increment 0 counter without opening a file")
+		return errors.New("Attempt to increment 0 counter without opening a file")
 	}
+
 	this.counterMap[fd]++
-	this.Unlock()
+
+	return nil
 }
 
 func (this *FileDescriptorCounterMap) Decrement(file *os.File) (err error) {
 	this.Lock()
+	defer this.Unlock()
+
 	fd := file.Fd()
 	//log.Printf("Decrement %d", fd)
 
 	if this.counterMap[fd] == 0 {
-		panic("Attempt to decrement a 0 counter")
+		return errors.New("Attempt to decrement a 0 counter")
 	}
 
 	this.counterMap[fd]--
@@ -57,6 +65,6 @@ func (this *FileDescriptorCounterMap) Decrement(file *os.File) (err error) {
 		err = file.Close()
 		//log.Printf("Close %d", fd)
 	}
-	this.Unlock()
+
 	return
 }

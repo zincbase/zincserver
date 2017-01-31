@@ -8,9 +8,9 @@ import (
 )
 
 var _ = Describe("MonoTime", func() {
-	It("Returns a time within a one minute range of the system time", func() {
+	It("Returns a time within a one second range of the system time", func() {
 		systemTimeUnixNano := time.Now().UnixNano()
-		const oneMinuteInNanoseconds = 60 * 1000000000
+		const oneMinuteInNanoseconds = 1 * 1000000000
 
 		Expect(MonoUnixTimeNano()).To(BeNumerically(">", systemTimeUnixNano-oneMinuteInNanoseconds))
 		Expect(MonoUnixTimeNano()).To(BeNumerically("<", systemTimeUnixNano+oneMinuteInNanoseconds))

@@ -12,6 +12,7 @@ import (
 	//"log"
 )
 
+// The datastore operation structure type.
 type DatastoreOperationsEntry struct {
 	// The parent server associated with this datastore
 	parentServer *Server
@@ -62,6 +63,8 @@ type DatastoreOperationsEntry struct {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Initialization
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Loads the datastore, if needed.
 func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 	// Lock using initialization mutex
 	this.initializationMutex.Lock()
@@ -198,6 +201,9 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Read operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Creates a reader to the datastore, starting at the first entry with commit timestamp
+// greater than the value given as argument.
 func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader io.Reader, readSize int64, err error) {
 	// Make sure the datastore is open
 	if this.file == nil {
@@ -224,6 +230,10 @@ func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader i
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Write operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Commits a transaction, which is given as a stream of serialized entries. The transaction is verified and
+// each one of its entries is stamped with new commit timestamp. The last entry is also added a transaction
+// end flag.
 func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte) (commitTimestamp int64, err error) {
 	// Make sure the datastore is open
 	if this.file == nil {
@@ -307,6 +317,8 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 	return
 }
 
+// Rewrites the datastore with the new content, applies similar processing to CommitTransaction before
+// writing the given data.
 func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTimestamp int64, err error) {
 	// Note: no need to check if the datastore is open here, this should succeed even if it is closed
 
@@ -368,6 +380,9 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 	return
 }
 
+// Schedules a flush if the datastore is configured to invoke it.
+// If the 'maxDelay' setting is set to 0, it flushes immediately
+// (This setting would effectively provide a 'full persistence' mode).
 func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 	// If a flush is already scheduled, return immediately
 	if this.flushScheduled {
@@ -454,6 +469,8 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 	}()
 }
 
+// Takes the given entry stream, deserializes it and non-destructively appends it
+// to the current cache of the datastore's content and returns the result.
 func (this *DatastoreOperationsEntry) CreateUpdatedDataCache(entryStreamReader io.ReaderAt, startOffset int64, endOffset int64) (updatedCache *VarMap, err error) {
 	// Check if a cached variable already exists
 	if this.dataCache == nil {
@@ -479,6 +496,8 @@ func (this *DatastoreOperationsEntry) CreateUpdatedDataCache(entryStreamReader i
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Compaction operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Compacts the datastore, if needed.
 func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 	// Store the start time of the operation
 	startTime := MonoUnixTimeMilli()
@@ -590,6 +609,7 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 	return true, nil
 }
 
+// Loads and caches the compaction state file, if a cached object isn't already available.
 func (this *DatastoreOperationsEntry) loadCompactionStateIfNeeded() error {
 	// If a compaction state cache value exists
 	if this.compactionState != nil {
@@ -624,6 +644,7 @@ func (this *DatastoreOperationsEntry) loadCompactionStateIfNeeded() error {
 	}
 }
 
+// Stores the current cached compaction state object to the compaction state file.
 func (this *DatastoreOperationsEntry) storeCompactionState() (err error) {
 	// Serialize the current compaction state cached object
 	newFileContent, err := json.Marshal(this.compactionState)
@@ -640,6 +661,7 @@ func (this *DatastoreOperationsEntry) storeCompactionState() (err error) {
 	return
 }
 
+// Resets the compaction state file.
 func (this *DatastoreOperationsEntry) resetCompactionState() (err error) {
 	// Clear the cached object
 	this.compactionState = &DatastoreCompactionState{}
@@ -649,6 +671,7 @@ func (this *DatastoreOperationsEntry) resetCompactionState() (err error) {
 	return
 }
 
+// Deletes the compaction state file.
 func (this *DatastoreOperationsEntry) deleteCompactionStateFile() (err error) {
 	// Nullify the cached object
 	this.compactionState = nil
@@ -658,6 +681,7 @@ func (this *DatastoreOperationsEntry) deleteCompactionStateFile() (err error) {
 	return
 }
 
+// Gets the compaction state file path.
 func (this *DatastoreOperationsEntry) compactionStateFilePath() string {
 	// Build the compaction state file path
 	return this.filePath + ".compactionState"
@@ -666,6 +690,8 @@ func (this *DatastoreOperationsEntry) compactionStateFilePath() string {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Cleanup and destruction operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Releases the file descriptor and clears all in-memory datastore resources.
 func (this *DatastoreOperationsEntry) Release() (err error) {
 	// If the datastore file isn't currently open
 	if this.file == nil {
@@ -699,6 +725,7 @@ func (this *DatastoreOperationsEntry) Release() (err error) {
 	return
 }
 
+// Destroys the datastore, but not its configuration.
 func (this *DatastoreOperationsEntry) Destroy() (err error) {
 	// Release the datastore
 	err = this.Release()
@@ -721,7 +748,7 @@ func (this *DatastoreOperationsEntry) Destroy() (err error) {
 		return
 	}
 
-	// The cached content is only wiped once the datastore has been successfuly
+	// The cached content is only cleared once the datastore has been successfuly
 	// destroyed
 	this.dataCache = nil
 
@@ -734,6 +761,8 @@ func (this *DatastoreOperationsEntry) Destroy() (err error) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Repair operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Tries rolling back the datastore to the latest successful transaction.
 func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction() (err error) {
 	// Get the size of the datastore file
 	fileSize, err := this.GetFileSize()
@@ -791,57 +820,92 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Configuration lookup operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Gets a string typed configuration value.
 func (this *DatastoreOperationsEntry) GetStringConfigValue(key string) (value string, err error) {
+	// If a datastore-specific configuration datastore is available
 	if this.configDatastore != nil {
+		// Get its cached object
 		cachedDatastoreConfig := this.configDatastore.dataCache
 
+		// If its cached object exists
 		if cachedDatastoreConfig != nil {
+			// Lookup the value for the given key
 			value, err = cachedDatastoreConfig.GetString(key)
+			
+			// If the key was found
 			if err == nil {
+				// Return its value
 				return
 			}
 		}
 	}
-
+	
+	// Otherwise, look up the key in the global configuration and return its value if found
 	return this.parentServer.GlobalConfig().GetString(key)
 }
 
+// Gets a boolean typed configuration value.
 func (this *DatastoreOperationsEntry) GetBoolConfigValue(key string) (value bool, err error) {
+	// If a datastore-specific configuration datastore is available
 	if this.configDatastore != nil {
+		// Get its cached object
 		cachedDatastoreConfig := this.configDatastore.dataCache
 
+		// If its cached object exists
 		if cachedDatastoreConfig != nil {
+			// Lookup the value for the given key
 			value, err = cachedDatastoreConfig.GetBool(key)
+
+			// If the key was found
 			if err == nil {
+				// Return the value
 				return
 			}
 		}
 	}
 
+	// Otherwise, look up the key in the global configuration and return its value if found
 	return this.parentServer.GlobalConfig().GetBool(key)
 }
 
+// Gets a 64-bit integer typed configuration value.
 func (this *DatastoreOperationsEntry) GetInt64ConfigValue(key string) (value int64, err error) {
+	// If a datastore-specific configuration datastore is available
 	if this.configDatastore != nil {
+		// Get its cached object
 		cachedDatastoreConfig := this.configDatastore.dataCache
 
+		// If its cached object exists
 		if cachedDatastoreConfig != nil {
+			// Lookup the value for the given key
 			value, err = cachedDatastoreConfig.GetInt64(key)
+			
+			// If the key was found
 			if err == nil {
+				// Return the value
 				return
 			}
 		}
 	}
-
+	
+	// Otherwise, look up the key in the global configuration and return its value if found
 	return this.parentServer.GlobalConfig().GetInt64(key)
 }
 
+// Gets a 64-bit float typed configuration value.
 func (this *DatastoreOperationsEntry) GetFloat64ConfigValue(key string) (value float64, err error) {
+	// If a datastore-specific configuration datastore is available
 	if this.configDatastore != nil {
+		// Get its cached object
 		cachedDatastoreConfig := this.configDatastore.dataCache
 
+		// If its cached object exists
 		if cachedDatastoreConfig != nil {
+			// Lookup the value for the given key
 			value, err = cachedDatastoreConfig.GetFloat64(key)
+
+			// If the key was found
 			if err == nil {
 				return
 			}
@@ -851,40 +915,63 @@ func (this *DatastoreOperationsEntry) GetFloat64ConfigValue(key string) (value f
 	return this.parentServer.GlobalConfig().GetFloat64(key)
 }
 
+// Gets the size of the datastore.
 func (this *DatastoreOperationsEntry) GetFileSize() (fileSize int64, err error) {
+	// Make sure the datastore is open
 	if this.file == nil {
 		return 0, DatastoreNotOpenErr
 	}
 
+	// Get the datastore file stat object
 	fileInfo, err := this.file.Stat()
+
+	// If an error occured while looking up the file stat
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// Get the file size from the stat object
 	fileSize = fileInfo.Size()
 
+	// Return the file size
 	return
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Misc operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Returns the time the datastore was last modified.
 func (this *DatastoreOperationsEntry) LastModifiedTime() int64 {
+	// Look up the latest update timestamp in the index
+	// Note the function would fatally error if the index is nil
 	return this.index.LatestUpdateTimestamp()
 }
 
+// Checks if this is a configuration datastore.
 func (this *DatastoreOperationsEntry) IsConfig() bool {
+	// Check if the filename has the suffix '.config'
 	return strings.HasSuffix(this.name, ".config")
 }
 
+// Checks if this is the global configuration datastore.
 func (this *DatastoreOperationsEntry) IsGlobalConfig() bool {
+	// Check if the filename is exactly ".config"
 	return this.name == ".config"
 }
 
+// Checks if this datastore should be cached in memory.
 func (this *DatastoreOperationsEntry) IsCached() bool {
+	// Return based on whether this is a configuration datastore
 	return this.IsConfig()
 }
 
+// Gets a timestamp and ensures that it's strictly greater than the latest update time.
+// In the rare case the current time is equal to or less than the latest update time,
+// it would wait as much as needed until that time has passed.
+// If the latest update time is far in the future, such that the system is running with severly inaccurate
+// clock, the function may effectively stall for a very long time.
 func (this *DatastoreOperationsEntry) GetColisionFreeTimestamp() (timestamp int64) {
 	timestamp = MonoUnixTimeMicro()
 
@@ -924,6 +1011,8 @@ func (this *DatastoreOperationsEntry) GetColisionFreeTimestamp() (timestamp int6
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Construction and global operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Constructs a new datastore object.
 func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *DatastoreOperationsEntry {
 	return &DatastoreOperationsEntry{
 		parentServer: parentServer,
@@ -943,6 +1032,7 @@ func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *Da
 	}
 }
 
+// Datastore compaction state struct type.
 type DatastoreCompactionState struct {
 	LastCompactionCheckTime       int64
 	LastCompactionCheckSize       int64

@@ -15,35 +15,35 @@ import (
 type DatastoreOperationsEntry struct {
 	// The parent server associated with this datastore
 	parentServer *Server
-	
+
 	// The identifier of the datastore
 	name string
 
 	// The path of the datastore file
-	filePath            string
-	
+	filePath string
+
 	// The datastore file descriptor, if open, otherwise nil
-	file                *os.File
+	file *os.File
 
 	// An datastore index allowing timestamp-to-offset lookups
-	index           *DatastoreIndex	
+	index *DatastoreIndex
 
 	// A notification source that allows to subscribe to future updates in the datastore
-	updateNotifier  *DatastoreUpdateNotifier
+	updateNotifier *DatastoreUpdateNotifier
 
 	// An object tracking the rate and type of operations performed by each client, allowing to set
 	// limits for this datastore
 	rateLimiter *RequestRateLimiter
 
 	// A flag that signifies if flush operation is currently scheduled
-	flushScheduled      bool
+	flushScheduled bool
 
 	// Cache object holding the compaction metadata file content
 	compactionState *DatastoreCompactionState
 
 	// A cache object containing the datastore content in parsed form.
 	// This is currently used only to cache configuration datastores
-	dataCache   *VarMap
+	dataCache *VarMap
 
 	// The associated configuration datastore opreations object. For the configuration datastores
 	// themselves, this would always be nil.
@@ -53,7 +53,7 @@ type DatastoreOperationsEntry struct {
 	initializationMutex *sync.Mutex
 
 	// A mutex object that is internally used to synchronize flushing operations
-	flushMutex          *sync.Mutex
+	flushMutex *sync.Mutex
 
 	// A reader-writer mutex for this datastore. Should only be used by consumers, not internally.
 	sync.RWMutex
@@ -155,11 +155,11 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 	}
 
 	// If this is a configuration datastore, cache its content
-	if this.IsConfig() { 
+	if this.IsConfig() {
 		var updatedDataCache *VarMap
 
 		// Load and deserialize the file's content
-		updatedDataCache, err = this.GetUpdatedDataCache(this.file, 0, fileSize)
+		updatedDataCache, err = this.CreateUpdatedDataCache(this.file, 0, fileSize)
 
 		// If some error occured while trying load the file's content
 		if err != nil {
@@ -178,7 +178,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		if err != nil {
 			switch err.(type) {
 			case *os.PathError:
-				// If the error was a "not found" error, that's OK, it means there simply 
+				// If the error was a "not found" error, that's OK, it means there simply
 				// datastore, isn't a configuration datastore for this datastore.
 				// set the error to 'nil', and continue
 				err = nil
@@ -229,7 +229,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 	if this.file == nil {
 		return 0, DatastoreNotOpenErr
 	}
-	
+
 	// If the transaction is empty, return without error
 	if len(transactionBytes) == 0 {
 		return
@@ -257,9 +257,9 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 	var updatedDataCache *VarMap
 
 	if this.IsCached() {
-		// Get an updated data cache value that would replace the old cache value, 
-		// once all write operations have completed successfully		
-		updatedDataCache, err = this.GetUpdatedDataCache(bytes.NewReader(transactionBytes), 0, int64(len(transactionBytes)))
+		// Get an updated data cache value that would replace the old cache value,
+		// once all write operations have completed successfully
+		updatedDataCache, err = this.CreateUpdatedDataCache(bytes.NewReader(transactionBytes), 0, int64(len(transactionBytes)))
 
 		// If an error has occurred while loading the cache, return
 		if err != nil {
@@ -285,7 +285,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 
 	// Perform a compaction check and compact if needed
 	compacted, err := this.CompactIfNeeded()
-	
+
 	// If an error occurred while compacting, return
 	if err != nil {
 		return
@@ -333,8 +333,8 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 
 	if this.IsCached() {
 		// Get an updated data cache value that would replace the old cache value
-		// once all write operations have successfuly completed		
-		updatedDataCache, err = this.GetUpdatedDataCache(bytes.NewReader(transactionBytes), 0, int64(len(transactionBytes)))
+		// once all write operations have successfuly completed
+		updatedDataCache, err = this.CreateUpdatedDataCache(bytes.NewReader(transactionBytes), 0, int64(len(transactionBytes)))
 		if err != nil {
 			return
 		}
@@ -370,7 +370,7 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 
 func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 	// If a flush is already scheduled, return immediately
-	if (this.flushScheduled) {
+	if this.flushScheduled {
 		return
 	}
 
@@ -385,7 +385,7 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 	// Get the maximum delay value for flushes
 	maxDelayToFlush, err := this.GetInt64ConfigValue("['datastore']['flush']['maxDelay']")
 
-	// If no matching key was found or an invalid flush delay is specified 
+	// If no matching key was found or an invalid flush delay is specified
 	// return without error
 	if err != nil || maxDelayToFlush < 0 {
 		return
@@ -410,7 +410,7 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 	}
 
 	// If a zero delay is defined
-	if (maxDelayToFlush == 0) {
+	if maxDelayToFlush == 0 {
 		// Flush immediately
 		flush(this.file)
 
@@ -425,7 +425,7 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 
 	// Store the file descriptor in a local variable
 	targetFile := this.file
-	
+
 	// Increment the file descriptor, to make sure it isn't released
 	FileDescriptors.Increment(targetFile)
 
@@ -454,16 +454,22 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 	}()
 }
 
-func (this *DatastoreOperationsEntry) GetUpdatedDataCache(entryStreamReader io.ReaderAt, startOffset int64, endOffset int64) (updatedCache *VarMap, err error) {
+func (this *DatastoreOperationsEntry) CreateUpdatedDataCache(entryStreamReader io.ReaderAt, startOffset int64, endOffset int64) (updatedCache *VarMap, err error) {
+	// Check if a cached variable already exists
 	if this.dataCache == nil {
+		// If it doesn't, use a new empty map
 		updatedCache = NewEmptyVarMap()
 	} else {
+		// If it does, create a clone of it
 		updatedCache = this.dataCache.Clone()
 	}
 
+	// Deserialize the given data and append it to the map
 	err = DeserializeEntryStreamReaderAndAppendToVarMap(entryStreamReader, startOffset, endOffset, updatedCache)
 
+	// If an error occured during the operation
 	if err != nil {
+		// Return the error
 		return nil, err
 	}
 
@@ -474,11 +480,13 @@ func (this *DatastoreOperationsEntry) GetUpdatedDataCache(entryStreamReader io.R
 /// Compaction operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
+	// Store the start time of the operation
 	startTime := MonoUnixTimeMilli()
 
+	// Get the current size of the index
 	currentSize := this.index.TotalSize
 
-	// Read configuration options for compaction
+	// Read related configuration options for compaction
 	compactionEnabled, _ := this.GetBoolConfigValue("['datastore']['compaction']['enabled']")
 	if compactionEnabled == false {
 		return false, nil
@@ -495,6 +503,7 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 		return false, nil
 	}
 
+	// Ensure compaction state is loaded
 	err := this.loadCompactionStateIfNeeded()
 	if err != nil {
 		return false, err
@@ -524,64 +533,91 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 		this.compactionState.LastCompactionCheckSize = currentSize
 		this.compactionState.LastCompactionCheckUnusedSize = unusedSize
 
+		// Store the updated compaction state
 		err = this.storeCompactionState()
+
+		// If an error has occured while storing the updated compaction state
 		if err != nil {
+			// Return the error
 			return false, err
 		}
 
+		// Return with no error
 		return false, nil
-	} else {
-		// Prepare for compaction: reset compaction state file
-		this.resetCompactionState()
 	}
+	
+	// Prepare for compaction: clear compaction state file
+	this.resetCompactionState()
 
-	// Rewrite the file with the compacted ranges and updated metadata
+	// Create a reader for the compacted datastore
 	compactedDatastoreReader := keyIndex.CreateReaderForCompactedRanges(this.file, 0)
 
+	// Rewrite the file with the compacted ranges
 	err = ReplaceFileSafely(this.filePath, compactedDatastoreReader)
+
+	// If an error occurred while rewriting the file
 	if err != nil {
+		// Return the error
 		return false, err
 	}
 
-	// Update compaction state file to the compacted size
+	// Update compaction state to the compacted size
 	this.compactionState.LastCompactionCheckTime = MonoUnixTimeMicro()
 	this.compactionState.LastCompactionCheckSize = compactedSize
 	this.compactionState.LastCompactionCheckUnusedSize = 0
 
+	// Store the updated state in the file
 	err = this.storeCompactionState()
+	
+	// If an error has occurred when storing the compaction state
 	if err != nil {
+		// Return the error
 		return false, err
 	}
 
 	// Release datastore resources
 	err = this.Release()
+	
+	// If an error has occurred when releasing the datastore
 	if err != nil {
+		// Return the error
 		return false, err
 	}
 
+	// Log message
 	this.parentServer.Log(fmt.Sprintf("Compacted datastore '%s' from %d to %d bytes in %dms", this.name, currentSize, compactedSize, MonoUnixTimeMilli()-startTime), 1)
 
 	return true, nil
 }
 
 func (this *DatastoreOperationsEntry) loadCompactionStateIfNeeded() error {
+	// If a compaction state cache value exists
 	if this.compactionState != nil {
+		// There is no need to do anything
 		return nil
 	} else {
+		// Create a compaction state cache value
 		this.compactionState = &DatastoreCompactionState{}
+
+		// Read the compaction state file
 		fileContent, err := ReadEntireFile(this.compactionStateFilePath())
 
-		if err == nil {
-			err = json.Unmarshal(fileContent, this.compactionState)
-
-			if err != nil {
-				return err
-			}
+		// If an error occurred when reading the file (most likely the file doesn't exist)
+		if err != nil {
+			// Return with no error
+			return nil
 		}
 
-		// Address the case where the compaction state file is invalid
-		if this.compactionState.LastCompactionCheckSize > this.index.TotalSize {
+		// Deserialize the file content from JSON
+		err = json.Unmarshal(fileContent, this.compactionState)
+
+		// If an error occurred while deserializing the file content
+		if err != nil {
+			// Reset the file
 			this.resetCompactionState()
+
+			// Return with no error
+			return nil
 		}
 
 		return nil
@@ -589,29 +625,41 @@ func (this *DatastoreOperationsEntry) loadCompactionStateIfNeeded() error {
 }
 
 func (this *DatastoreOperationsEntry) storeCompactionState() (err error) {
+	// Serialize the current compaction state cached object
 	newFileContent, err := json.Marshal(this.compactionState)
+
+	// If an error occured during the operation
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// Rewrite the compaction state file with the new state
 	err = RewriteFile(this.compactionStateFilePath(), bytes.NewReader(newFileContent), false)
 
 	return
 }
 
 func (this *DatastoreOperationsEntry) resetCompactionState() (err error) {
+	// Clear the cached object
 	this.compactionState = &DatastoreCompactionState{}
+
+	// Store the empty state to the file
 	err = this.storeCompactionState()
 	return
 }
 
 func (this *DatastoreOperationsEntry) deleteCompactionStateFile() (err error) {
+	// Nullify the cached object
 	this.compactionState = nil
+
+	// Delete the file
 	err = os.Remove(this.compactionStateFilePath())
 	return
 }
 
 func (this *DatastoreOperationsEntry) compactionStateFilePath() string {
+	// Build the compaction state file path
 	return this.filePath + ".compactionState"
 }
 
@@ -619,17 +667,28 @@ func (this *DatastoreOperationsEntry) compactionStateFilePath() string {
 /// Cleanup and destruction operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 func (this *DatastoreOperationsEntry) Release() (err error) {
+	// If the datastore file isn't currently open
 	if this.file == nil {
+		// Return with no error
 		return nil
 	}
 
+	// Decrement the file descriptor counter
 	err = FileDescriptors.Decrement(this.file)
+
+	// If an error occured when decrementing the counter
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// Clear file object
 	this.file = nil
+	
+	// Clear index
 	this.index = nil
+
+	// Clear compaction state cached object
 	this.compactionState = nil
 
 	// The cached data shouldn't be cleared here
@@ -641,21 +700,32 @@ func (this *DatastoreOperationsEntry) Release() (err error) {
 }
 
 func (this *DatastoreOperationsEntry) Destroy() (err error) {
+	// Release the datastore
 	err = this.Release()
+	
+	// If an error occurred when releasing the datastore
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// Delete the compaction state file (any error during the operation is ignored)
 	this.deleteCompactionStateFile()
+
+	// Delete the datastore file
 	err = DeleteFileSafely(this.filePath)
+	
+	// If an error occurred during the operation
 	if err != nil {
+		// Return the error
 		return
 	}
 
 	// The cached content is only wiped once the datastore has been successfuly
-	// Destroyed
+	// destroyed
 	this.dataCache = nil
 
+	// Announce the operation
 	this.updateNotifier.AnnounceUpdate(math.MaxInt64)
 
 	return
@@ -665,35 +735,54 @@ func (this *DatastoreOperationsEntry) Destroy() (err error) {
 /// Repair operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction() (err error) {
+	// Get the size of the datastore file
 	fileSize, err := this.GetFileSize()
+
+	// If an error occurred when getting the size
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// Get safe truncation size
 	truncatedSize, err := FindSafeTruncationSize(NewPrefetchingReaderAt(this.file), fileSize)
 
+	// If an error occurred when checking for a truncation size
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// If the truncated datastore size is equal to the current size of the datastore
 	if truncatedSize == fileSize {
+		// No need to repair anything
 		this.parentServer.Log(fmt.Sprintf("No need to repair datastore '%s'", this.name), 1)
 		return
 	}
 
+	// Truncate the datastore file
 	err = this.file.Truncate(truncatedSize)
-	if err == nil {
-		this.parentServer.Log(fmt.Sprintf("Truncated datastore '%s' from %d to %d bytes", this.name, fileSize, truncatedSize), 1)
 
-		// Try recreating journal index up to the truncated size
-		this.index = NewDatastoreIndex()
-		err = this.index.AddFromEntryStream(this.file, 0, truncatedSize)
-
-		if err != nil {
-			this.parentServer.Log(fmt.Sprintf("Failed to recreate index for datastore '%s' after repair", this.name), 1)
-		}
-	} else {
+	// If an error occurred when truncating the file
+	if err != nil {
+		// Log a message
 		this.parentServer.Log(fmt.Sprintf("Error while attempting roll-back of datastore '%s'", this.name), 1)
+		
+		// Return the error
+		return
+	}
+	
+	// Log a message
+	this.parentServer.Log(fmt.Sprintf("Truncated datastore '%s' from %d to %d bytes", this.name, fileSize, truncatedSize), 1)
+
+	// Try recreating the index up to the truncated size
+	this.index = NewDatastoreIndex()
+	err = this.index.AddFromEntryStream(this.file, 0, truncatedSize)
+
+	// If an error occurred when recreating the index
+	if err != nil {
+		// Log a message
+		this.parentServer.Log(fmt.Sprintf("Failed to recreate index for datastore '%s' after repair", this.name), 1)
 	}
 
 	return
@@ -819,7 +908,7 @@ func (this *DatastoreOperationsEntry) GetColisionFreeTimestamp() (timestamp int6
 		// Calculate the needed sleep time
 		sleepTime := lastModifiedTime - timestamp + 1
 
-		// Log a message 
+		// Log a message
 		this.parentServer.Log(fmt.Sprintf("The last modification time of datastore '%s' is greater than current time. Sleeping for %dms until the anomaly is resolved..", this.name, sleepTime), 1)
 
 		// Sleep until timestamp is strictly greater than the last modification time

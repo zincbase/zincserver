@@ -10,7 +10,7 @@ func CloneSlice(buffer []byte) (result []byte) {
 	return
 }
 
-func ReadCompleteStream(reader io.Reader) (result []byte, err error) {
+func ReadEntireStream(reader io.Reader) (result []byte, err error) {
 	memoryWriter := NewMemoryWriter()
 	_, err = io.Copy(memoryWriter, reader)
 	if err != nil {

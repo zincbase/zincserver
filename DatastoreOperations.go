@@ -181,7 +181,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 		return
 	}
 
-	// Check size limits
+	// Check datastore size limits
 	datastoreSizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxSize']")
 
 	if datastoreSizeLimit > 0 && this.index.TotalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
@@ -243,7 +243,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 }
 
 func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTimestamp int64, err error) {
-	// Check size limits
+	// Check datastore size limits
 	datastoreSizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxSize']")
 
 	if datastoreSizeLimit > 0 && int64(len(transactionBytes)) > datastoreSizeLimit {

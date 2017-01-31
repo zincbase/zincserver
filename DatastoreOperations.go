@@ -9,30 +9,53 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 	//"log"
 )
 
 type DatastoreOperationsEntry struct {
+	// The parent server associated with this datastore
+	parentServer *Server
+	
+	// The identifier of the datastore
 	name string
 
+	// The path of the datastore file
 	filePath            string
+	
+	// The datastore file descriptor, if open, otherwise nil
 	file                *os.File
-	initializationMutex *sync.Mutex
-	flushMutex          *sync.Mutex
-	flushScheduled      bool
 
-	compactionState *DatastoreCompactionState
-	index           *DatastoreIndex
+	// An datastore index allowing timestamp-to-offset lookups
+	index           *DatastoreIndex	
+
+	// A notification source that allows to subscribe to future updates in the datastore
 	updateNotifier  *DatastoreUpdateNotifier
 
-	parentServer *Server
-
-	dataCache   *VarMap
+	// An object tracking the rate and type of operations performed by each client, allowing to set
+	// limits for this datastore
 	rateLimiter *RequestRateLimiter
 
+	// A flag that signifies if flush operation is currently scheduled
+	flushScheduled      bool
+
+	// Cache object holding the compaction metadata file content
+	compactionState *DatastoreCompactionState
+
+	// A cache object containing the datastore content in parsed form.
+	// This is currently used only to cache configuration datastores
+	dataCache   *VarMap
+
+	// The associated configuration datastore opreations object. For the configuration datastores
+	// themselves, this would always be nil.
 	configDatastore *DatastoreOperationsEntry
 
+	// A mutex object that is internally used to prevent datastore initialization races (LoadIfNeeded)
+	initializationMutex *sync.Mutex
+
+	// A mutex object that is internally used to synchronize flushing operations
+	flushMutex          *sync.Mutex
+
+	// A reader-writer mutex for this datastore. Should only be used by consumers, not internally.
 	sync.RWMutex
 }
 
@@ -49,6 +72,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		return
 	}
 
+	// Start measuring the operation time
 	startTime := MonoUnixTimeMilliFloat()
 
 	// Open file
@@ -73,7 +97,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		if err == io.ErrUnexpectedEOF {
 			this.parentServer.Log(fmt.Sprintf("Possible incomplete transcacion found in datastore '%s'. Attempting roll-back..", this.name), 1)
 
-			// Attempt roll back to last succesful transaction
+			// Attempt to roll back to last succesful transaction
 			err = this.TryRollingBackToLastSuccessfulTransaction()
 			if err != nil {
 				this.Release()
@@ -98,16 +122,22 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 	// Note this could have been caused by a previous truncation to 0 size.
 	if fileSize == 0 {
 		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has length 0. Adding creation entry..", this.name), 1)
+		// Reset the file with a valid creation entry
 		_, err = io.Copy(this.file, CreateNewDatastoreReaderFromBytes([]byte{}, MonoUnixTimeMicro()))
 
+		// If some error occured while trying to reset the file
 		if err != nil {
+			// Release and return the error
 			this.Release()
 			return
 		}
 
 		// Get file size again
 		fileSize, err = this.GetFileSize()
+
+		// If some error occured while trying to get the file size
 		if err != nil {
+			// Release and return the error
 			this.Release()
 			return
 		}
@@ -116,36 +146,51 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		this.index = NewDatastoreIndex()
 		err = this.index.AddFromEntryStream(this.file, 0, fileSize)
 
+		// If some error occured while trying to recreate the index
 		if err != nil {
+			// Release and return the error
 			this.Release()
 			return
 		}
 	}
 
-	if this.IsConfig() { // If this is a configuration datastore, cache its content
+	// If this is a configuration datastore, cache its content
+	if this.IsConfig() { 
 		var updatedDataCache *VarMap
 
+		// Load and deserialize the file's content
 		updatedDataCache, err = this.GetUpdatedDataCache(this.file, 0, fileSize)
+
+		// If some error occured while trying load the file's content
 		if err != nil {
+			// Release and return the error
 			this.Release()
 			return
 		}
 
+		// Atomically replace the data cache with the new one
 		this.dataCache = updatedDataCache
-	} else { // Otherwise, load corresponding configuration datastore, if needed
+	} else {
+		// Otherwise, load corresponding configuration datastore, if needed
 		err = this.configDatastore.LoadIfNeeded()
 
+		// If some error occured while trying load the configuration datastore
 		if err != nil {
 			switch err.(type) {
 			case *os.PathError:
+				// If the error was a "not found" error, that's OK, it means there simply 
+				// datastore, isn't a configuration datastore for this datastore.
+				// set the error to 'nil', and continue
 				err = nil
 			default:
+				// Otherwise, release and return the error
 				this.Release()
 				return
 			}
 		}
 	}
 
+	// Log a completion message to console
 	this.parentServer.Log(fmt.Sprintf("Loaded datastore '%s' in %fms", this.name, MonoUnixTimeMilliFloat()-startTime), 1)
 	return
 }
@@ -154,15 +199,22 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 /// Read operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader io.Reader, readSize int64, err error) {
+	// Make sure the datastore is open
 	if this.file == nil {
 		return nil, 0, DatastoreNotOpenErr
 	}
 
+	// Use the index to find the offset of the first entry matching the condition
 	offset := this.index.FindOffsetOfFirstEntryUpdatedAfter(updatedAfter)
+
+	// If no such entry was found
 	if offset == -1 {
+		// Return an empty reader with zero length
 		return EmptyReader{}, 0, nil
 	}
 
+	// Create a reader for the range between the offset and the total
+	// size of the indexed entries (in most cases, this would be the size of the file)
 	reader = NewRangeReader(this.file, offset, int64(this.index.TotalSize))
 	readSize = this.index.TotalSize - offset
 
@@ -173,17 +225,20 @@ func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader i
 /// Write operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte) (commitTimestamp int64, err error) {
+	// Make sure the datastore is open
 	if this.file == nil {
 		return 0, DatastoreNotOpenErr
 	}
-
+	
+	// If the transaction is empty, return without error
 	if len(transactionBytes) == 0 {
 		return
 	}
 
-	// Check datastore size limits
+	// Get the datastore size limit
 	datastoreSizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxSize']")
 
+	// Make sure the transaction wouldn't cause it to exceed this limit
 	if datastoreSizeLimit > 0 && this.index.TotalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
 		return 0, DatastoreTooLargeErr{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
@@ -191,19 +246,22 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 	// Get commit timestamp
 	commitTimestamp = this.GetColisionFreeTimestamp()
 
-	// Validate and prepare transaction: rewrite timestamp and ensure transaction end mark
+	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
 	// for last entry
 	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp)
 	if err != nil {
 		return
 	}
 
-	// If this is a datastore should be cached, get an updated data cache value that
-	// would replace the old cache value once all write operations complete successfuly
+	// If this datastore should be cached
 	var updatedDataCache *VarMap
 
 	if this.IsCached() {
+		// Get an updated data cache value that would replace the old cache value, 
+		// once all write operations have completed successfully		
 		updatedDataCache, err = this.GetUpdatedDataCache(bytes.NewReader(transactionBytes), 0, int64(len(transactionBytes)))
+
+		// If an error has occurred while loading the cache, return
 		if err != nil {
 			return
 		}
@@ -211,85 +269,96 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 
 	// Write the transaction to the file
 	_, err = this.file.WriteAt(transactionBytes, int64(this.index.TotalSize))
+
+	// If an error occured when writing to the file, return
 	if err != nil {
 		return
 	}
 
-	// Update index
+	// Update the index with the timestamps and offsets of the new entries
 	err = this.index.AppendFromBuffer(transactionBytes)
+
+	// If an error occured while updating the index, return
 	if err != nil {
 		return
 	}
 
 	// Perform a compaction check and compact if needed
 	compacted, err := this.CompactIfNeeded()
+	
+	// If an error occurred while compacting, return
 	if err != nil {
 		return
 	}
 
-	// If compaction did not occur, schedule a flush, if needed.
+	// If compaction was not needed, schedule a flush, if needed.
 	if !compacted {
 		this.ScheduleFlushIfNeeded()
 	}
 
-	// Update cache if needed
+	// Now that data has been successfuly written to the file system, update cache if needed
 	if updatedDataCache != nil {
 		this.dataCache = updatedDataCache
 	}
 
 	// Announce the update
 	this.updateNotifier.AnnounceUpdate(commitTimestamp)
+
 	return
 }
 
 func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTimestamp int64, err error) {
-	// Check datastore size limits
+	// Note: no need to check if the datastore is open here, this should succeed even if it is closed
+
+	// Get the datastore size limit
 	datastoreSizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxSize']")
 
+	// Make sure the transaction wouldn't cause it to exceed this limit
 	if datastoreSizeLimit > 0 && int64(len(transactionBytes)) > datastoreSizeLimit {
 		return 0, DatastoreTooLargeErr{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
 
-	// Get commit timestamp
+	// Get a safe commit timestamp (must be strictly greater than a previous commit timestamp)
 	commitTimestamp = this.GetColisionFreeTimestamp()
 
-	// Validate and prepare transaction: rewrite timestamp and ensure transaction end mark
+	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
 	// for last entry
 	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp)
 	if err != nil {
 		return
 	}
 
-	// If this datastore should be cached, get an updated data cache value that
-	// would replace the old cache value once all write operations complete successfuly
+	// If this datastore should be cached
 	var updatedDataCache *VarMap
 
 	if this.IsCached() {
+		// Get an updated data cache value that would replace the old cache value
+		// once all write operations have successfuly completed		
 		updatedDataCache, err = this.GetUpdatedDataCache(bytes.NewReader(transactionBytes), 0, int64(len(transactionBytes)))
 		if err != nil {
 			return
 		}
 	}
 
-	// Close file and release all resources
+	// Close the file and release all resources
 	err = this.Release()
 	if err != nil {
 		return
 	}
 
-	// Reset compaction state file
+	// Reset compaction state file (all of its values would be reset to zero)
 	err = this.resetCompactionState()
 	if err != nil {
 		return
 	}
 
-	// Replace file
+	// Safely replace file the datastore file with a creation entry and the new transaction as content
 	err = ReplaceFileSafely(this.filePath, CreateNewDatastoreReaderFromBytes(transactionBytes, commitTimestamp))
 	if err != nil {
 		return
 	}
 
-	// Update cache if needed
+	// Now that data has been written to the file system, update the data cache if needed
 	if updatedDataCache != nil {
 		this.dataCache = updatedDataCache
 	}
@@ -300,40 +369,87 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 }
 
 func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
+	// If a flush is already scheduled, return immediately
+	if (this.flushScheduled) {
+		return
+	}
+
+	// Get the flush setting for this datastore
 	flushEnabled, err := this.GetBoolConfigValue("['datastore']['flush']['enabled']")
 
+	// If the operation failed or flush is disabled, return without error
 	if err != nil || flushEnabled == false {
 		return
 	}
 
+	// Get the maximum delay value for flushes
 	maxDelayToFlush, err := this.GetInt64ConfigValue("['datastore']['flush']['maxDelay']")
 
-	if err != nil || maxDelayToFlush < 0 || this.flushScheduled {
+	// If no matching key was found or an invalid flush delay is specified 
+	// return without error
+	if err != nil || maxDelayToFlush < 0 {
 		return
 	}
 
-	this.flushScheduled = true
-
-	targetFile := this.file
-	FileDescriptors.Increment(targetFile)
-
-	go func() {
-		if maxDelayToFlush > 0 {
-			time.Sleep(time.Duration(maxDelayToFlush) * time.Millisecond)
-		}
-
-		this.flushMutex.Lock()
-		defer this.flushMutex.Unlock()
-
-		this.flushScheduled = false
-
+	// Define a local function that will perorm the flush operation
+	flush := func(file *os.File) {
+		// Store the start time of the operation
 		startTime := MonoUnixTimeMilli()
-		err := targetFile.Sync()
+
+		// Call the appropriate OS `sync` function
+		err := file.Sync()
+
+		// If no error while executing the operation
 		if err == nil {
+			// Log a success message to the console
 			this.parentServer.Log(fmt.Sprintf("Flushed datastore '%s' in %dms", this.name, MonoUnixTimeMilli()-startTime), 1)
 		} else {
+			// Otherwise log a failure message to the console
 			this.parentServer.Log(fmt.Sprintf("Error flushing datastore '%s'. %s", this.name, err.Error()), 1)
 		}
+	}
+
+	// If a zero delay is defined
+	if (maxDelayToFlush == 0) {
+		// Flush immediately
+		flush(this.file)
+
+		// Then return
+		return
+	}
+
+	// Otherwise, a greater-than-zero flush time is defined
+
+	// Set a flag to signify a flush is currently scheduled
+	this.flushScheduled = true
+
+	// Store the file descriptor in a local variable
+	targetFile := this.file
+	
+	// Increment the file descriptor, to make sure it isn't released
+	FileDescriptors.Increment(targetFile)
+
+	// Continue in a new goroutine
+	go func() {
+		// If the specified delay is larger than zero
+		if maxDelayToFlush > 0 {
+			// Wait until it's over
+			Sleep(maxDelayToFlush)
+		}
+
+		// Acquire a lock for the flush
+		this.flushMutex.Lock()
+		
+		// Defer this lock to be released once the function has completed
+		defer this.flushMutex.Unlock()
+
+		// Disable the flush scheduled flag
+		this.flushScheduled = false
+
+		// Perform the flush using the helper function
+		flush(targetFile)
+
+		// Decrement the file descriptor
 		FileDescriptors.Decrement(targetFile)
 	}()
 }

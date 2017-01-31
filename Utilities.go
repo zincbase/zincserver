@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	//"unsafe"
 	"bytes"
+	"time"
 )
 
 func MinInt(a, b int) int {
@@ -67,4 +68,8 @@ func RandomUtf8String(length int, maxCodePoint int) string {
 	}
 
 	return resultBuffer.String()
+}
+
+func Sleep(duration int64) {
+	time.Sleep(time.Duration(duration) * time.Millisecond)
 }

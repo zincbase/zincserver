@@ -290,7 +290,7 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 	// Write the header
 	w.WriteHeader(http.StatusOK)
 
-	//If the request had a GET method (HEAD would skip this), send the body of the request.
+	// If the request had a GET method (HEAD would skip this), send the body of the request.
 	if bodyShouldBeSent {
 		_, err = io.Copy(w, resultReader)
 		if err != nil {

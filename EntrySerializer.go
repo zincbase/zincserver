@@ -183,7 +183,7 @@ func DeserializeEntryStreamReaderAndAppendToVarMap(source io.ReaderAt, startOffs
 ////////////////////////////////////////////////////////////////////////////////
 // Validation
 ////////////////////////////////////////////////////////////////////////////////
-func ValidateAndPrepareTransaction(entryStream []byte, newTimestamp int64) error {
+func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64) error {
 	const minAllowedTimestamp int64 = 1483221600 * 1000000
 	maxAllowedTimestamp := MonoUnixTimeMicro() + (30 * 1000000)
 
@@ -216,8 +216,8 @@ func ValidateAndPrepareTransaction(entryStream []byte, newTimestamp int64) error
 			return errors.New("Encountered an entry header containing an update time greater than 30 seconds past the server's clock.")
 		}
 
-		if newTimestamp > 0 {
-			iteratorResult.PrimaryHeader.CommitTime = newTimestamp
+		if newCommitTimestamp > 0 {
+			iteratorResult.PrimaryHeader.CommitTime = newCommitTimestamp
 		}
 
 		if iteratorResult.Offset+iteratorResult.Size == int64(len(entryStream)) {

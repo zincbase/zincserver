@@ -27,10 +27,10 @@ var _ = Describe("DatastoreKeyIndex", func() {
 		serializedEntryOffsets = make([]int64, len(serializedEntries))
 
 		for i, _ := range serializedEntries {
-			serializedEntryOffsets[i] = int64(len(ConcatBufferList(serializedEntries[0:i])))
+			serializedEntryOffsets[i] = int64(len(ConcatSliceList(serializedEntries[0:i])))
 		}
 
-		entryStream = ConcatBufferList(serializedEntries)
+		entryStream = ConcatSliceList(serializedEntries)
 	})
 
 	It("Creates a new index and adds elements to it", func() {
@@ -81,7 +81,7 @@ var _ = Describe("DatastoreKeyIndex", func() {
 		result, err := keyIndex.CompactToBuffer(bytes.NewReader(entryStream), 0)
 
 		Expect(err).To(BeNil())
-		Expect(result).To(Equal(ConcatBuffers(serializedEntries[3], serializedEntries[4], serializedEntries[6])))
+		Expect(result).To(Equal(ConcatSlices(serializedEntries[3], serializedEntries[4], serializedEntries[6])))
 	})
 
 	It("Calculates compacted size", func() {

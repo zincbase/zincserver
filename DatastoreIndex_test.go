@@ -26,7 +26,7 @@ var _ = Describe("DatastoreIndex", func() {
 			serializedEntries[i] = SerializeEntry(entry)
 		}
 
-		testData := ConcatBufferList(serializedEntries)
+		testData := ConcatSliceList(serializedEntries)
 
 		err := index.AddFromEntryStream(bytes.NewReader(testData), 0, int64(len(testData)))
 		Expect(err).To(BeNil())
@@ -38,7 +38,7 @@ var _ = Describe("DatastoreIndex", func() {
 		}
 
 		for i, indexEntry := range index.Entries {
-			Expect(int(indexEntry.offset)).To(Equal(len(ConcatBufferList(serializedEntries[0:i]))))
+			Expect(int(indexEntry.offset)).To(Equal(len(ConcatSliceList(serializedEntries[0:i]))))
 		}
 	})
 
@@ -59,7 +59,7 @@ var _ = Describe("DatastoreIndex", func() {
 			serializedEntries[i] = SerializeEntry(entry)
 		}
 
-		entryStream := ConcatBufferList(serializedEntries)
+		entryStream := ConcatSliceList(serializedEntries)
 
 		err := index.AddFromEntryStream(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
 
@@ -85,7 +85,7 @@ var _ = Describe("DatastoreIndex", func() {
 			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key1"), []byte("Value1")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key2"), []byte("Value2")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key1"), []byte("Value3")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd},[]byte{}, []byte("Key1"), []byte("Value4")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key1"), []byte("Value4")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key2"), []byte("Value5")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key3"), []byte("Value7")},
 		}

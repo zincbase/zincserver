@@ -23,7 +23,7 @@ var _ = Describe("EntryStreamIterator", func() {
 			serializedEntries[i] = SerializeEntry(entry)
 		}
 
-		entryStream := ConcatBufferList(serializedEntries)
+		entryStream := ConcatSliceList(serializedEntries)
 
 		moveNext := NewEntryStreamIterator(bytes.NewReader(entryStream), 0, int64(len(entryStream)), false)
 

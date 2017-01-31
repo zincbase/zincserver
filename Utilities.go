@@ -61,23 +61,3 @@ func RandomUtf8String(length int, maxCodePoint int) string {
 
 	return resultBuffer.String()
 }
-
-/*
-func ConcatStrings(fragments ...string) string {
-	var totalLength int
-
-	for _, str := range fragments {
-		totalLength += len(str)
-	}
-
-	result := make([]byte, totalLength)
-	offset := 0
-
-	for _, str := range fragments {
-		copy(result[offset:], str)
-		offset += len(str)
-	}
-
-	return string(result)
-}
-*/

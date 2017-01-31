@@ -241,12 +241,10 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 		return
 	}
 
-	compactResponse := query.Get("compact") == "true"
-
 	var resultReader io.Reader
-
 	var readSize int64
-	resultReader, readSize, err = operations.CreateReader(updatedAfter, compactResponse)
+
+	resultReader, readSize, err = operations.CreateReader(updatedAfter)
 	if err != nil {
 		operations.RUnlock()
 		return err
@@ -319,7 +317,7 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 		var resultReader io.Reader
 		var messageWriter io.WriteCloser
 
-		resultReader, _, err = operations.CreateReader(updatedAfter, false)
+		resultReader, _, err = operations.CreateReader(updatedAfter)
 
 		if err != nil {
 			operations.RUnlock()

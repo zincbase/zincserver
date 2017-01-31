@@ -153,7 +153,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Read operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64, compact bool) (reader io.Reader, readSize int64, err error) {
+func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader io.Reader, readSize int64, err error) {
 	if this.file == nil {
 		return nil, 0, DatastoreNotOpenErr
 	}
@@ -163,16 +163,8 @@ func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64, compact b
 		return EmptyReader{}, 0, nil
 	}
 
-	if compact {
-		keyIndex := NewDatastoreKeyIndex()
-		keyIndex.AddFromEntryStream(NewPrefetchingReaderAt(this.file), offset, int64(this.index.TotalSize))
-
-		reader = keyIndex.CreateReaderForCompactedRanges(this.file, offset)
-		readSize = keyIndex.GetCompactedSize()
-	} else {
-		reader = NewRangeReader(this.file, offset, int64(this.index.TotalSize))
-		readSize = this.index.TotalSize - offset
-	}
+	reader = NewRangeReader(this.file, offset, int64(this.index.TotalSize))
+	readSize = this.index.TotalSize - offset
 
 	return
 }

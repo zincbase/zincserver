@@ -79,7 +79,7 @@ var _ = Describe("DatastoreIndex", func() {
 
 	It("Gives the latest updated timestamp", func() {
 		index := NewDatastoreIndex()
-		Expect(index.LatestUpdateTimestamp()).To(Equal(int64(-1)))
+		Expect(index.LatestTimestamp()).To(Equal(int64(-1)))
 
 		testEntries := []*Entry{
 			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte{}, []byte("Key1"), []byte("Value1")},
@@ -98,7 +98,7 @@ var _ = Describe("DatastoreIndex", func() {
 		for i, _ := range serializedEntries {
 			err := index.AddFromEntryStream(bytes.NewReader(serializedEntries[i]), 0, int64(len(serializedEntries[i])))
 			Expect(err).To(BeNil())
-			Expect(index.LatestUpdateTimestamp()).To(Equal(testEntries[i].PrimaryHeader.CommitTime))
+			Expect(index.LatestTimestamp()).To(Equal(testEntries[i].PrimaryHeader.CommitTime))
 		}
 	})
 })

@@ -449,7 +449,7 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 	if err != nil {
 		// Check for datastore too large errors and respond accordingly
 		switch err.(type) {
-		case DatastoreTooLargeErr:
+		case ErrDatastoreTooLarge:
 			endRequestWithError(w, r, http.StatusForbidden, err)
 			err = nil
 		}
@@ -470,7 +470,7 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 }
 
 func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
-	// Read the entire request body to memory	
+	// Read the entire request body to memory
 	serializedEntries, err := ReadEntireStream(r.Body)
 	if err != nil {
 		return
@@ -487,7 +487,7 @@ func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *h
 	if err != nil {
 		// Check for datastore too large errors and respond accordingly
 		switch err.(type) {
-		case DatastoreTooLargeErr:
+		case ErrDatastoreTooLarge:
 			endRequestWithError(w, r, http.StatusForbidden, err)
 			err = nil
 		}

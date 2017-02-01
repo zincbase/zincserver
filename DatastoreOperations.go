@@ -12,6 +12,13 @@ import (
 	//"log"
 )
 
+// Datastore compaction state struct type.
+type DatastoreCompactionState struct {
+	LastCompactionCheckTime       int64
+	LastCompactionCheckSize       int64
+	LastCompactionCheckUnusedSize int64
+}
+
 // The datastore operation structure type.
 type DatastoreOperationsEntry struct {
 	// The parent server associated with this datastore
@@ -61,8 +68,28 @@ type DatastoreOperationsEntry struct {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-/// Initialization
+/// Construction and initialization
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Constructs a new datastore object.
+func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *DatastoreOperationsEntry {
+	return &DatastoreOperationsEntry{
+		parentServer: parentServer,
+
+		name:                datastoreName,
+		filePath:            parentServer.startupOptions.StoragePath + "/" + datastoreName,
+		file:                nil,
+		initializationMutex: &sync.Mutex{},
+		flushMutex:          &sync.Mutex{},
+		index:               nil,
+		compactionState:     nil,
+		updateNotifier:      NewDatastoreUpdateNotifier(),
+		configDatastore:     nil,
+
+		dataCache:   nil,
+		rateLimiter: NewRequestRateLimiter(),
+	}
+}
 
 // Loads the datastore, if needed.
 func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
@@ -92,38 +119,48 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 	}
 
 	// Create index
-	this.index = NewDatastoreIndex()
+	this.index = NewDatastoreIndexWithFullChecksumVerification()
 	err = this.index.AddFromEntryStream(NewPrefetchingReaderAt(this.file), 0, fileSize)
 
 	if err != nil {
 		// Check if file ends unexpectedly, or last entry does not include a transaction end marker
-		if err == io.ErrUnexpectedEOF {
-			this.parentServer.Log(fmt.Sprintf("Possible incomplete transcacion found in datastore '%s'. Attempting roll-back..", this.name), 1)
+		if err == io.ErrUnexpectedEOF || err == ErrCorruptedEntry {
+			this.parentServer.Log(fmt.Sprintf("An incomplete or corrupted transcacion found in datastore '%s'. Attempting roll-back..", this.name), 1)
 
 			// Attempt to roll back to last succesful transaction
 			err = this.TryRollingBackToLastSuccessfulTransaction()
+
+			// If an error occurred when rolling back
 			if err != nil {
+				// Release
 				this.Release()
+
+				// Return the error
 				return
 			}
 
 			// Get file size again
 			fileSize, err = this.GetFileSize()
+
+			// If an error occurred when getting the file size
 			if err != nil {
+				// Release
 				this.Release()
+
+				// Return the error
 				return
 			}
 		} else {
-
-			// Index creation failed for some other reason, release and fail.
+			// Index creation failed for some other reason, release and return the error
 			this.Release()
 			return
 		}
 	}
 
-	// Check if file is empty. I.e. it doesn't have a creation entry.
-	// Note this could have been caused by a previous truncation to 0 size.
+	// Check if the datastore file is empty. I.e. it doesn't have a creation entry.
+	// Note this could have been caused by a previous truncation to a 0 size.
 	if fileSize == 0 {
+		// Log message
 		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has length 0. Adding creation entry..", this.name), 1)
 		// Reset the file with a valid creation entry
 		_, err = io.Copy(this.file, CreateNewDatastoreReaderFromBytes([]byte{}, MonoUnixTimeMicro()))
@@ -146,7 +183,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		}
 
 		// Recreate index
-		this.index = NewDatastoreIndex()
+		this.index = NewDatastoreIndexWithFullChecksumVerification()
 		err = this.index.AddFromEntryStream(this.file, 0, fileSize)
 
 		// If some error occured while trying to recreate the index
@@ -207,7 +244,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader io.Reader, readSize int64, err error) {
 	// Make sure the datastore is open
 	if this.file == nil {
-		return nil, 0, DatastoreNotOpenErr
+		return nil, 0, ErrDatastoreNotOpen
 	}
 
 	// Use the index to find the offset of the first entry matching the condition
@@ -237,7 +274,7 @@ func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader i
 func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte) (commitTimestamp int64, err error) {
 	// Make sure the datastore is open
 	if this.file == nil {
-		return 0, DatastoreNotOpenErr
+		return 0, ErrDatastoreNotOpen
 	}
 
 	// If the transaction is empty, return without error
@@ -250,7 +287,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 
 	// Make sure the transaction wouldn't cause it to exceed this limit
 	if datastoreSizeLimit > 0 && this.index.TotalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
-		return 0, DatastoreTooLargeErr{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
+		return 0, ErrDatastoreTooLarge{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
 
 	// Get commit timestamp
@@ -327,7 +364,7 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 
 	// Make sure the transaction wouldn't cause it to exceed this limit
 	if datastoreSizeLimit > 0 && int64(len(transactionBytes)) > datastoreSizeLimit {
-		return 0, DatastoreTooLargeErr{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
+		return 0, ErrDatastoreTooLarge{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
 
 	// Get a safe commit timestamp (must be strictly greater than a previous commit timestamp)
@@ -336,37 +373,52 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
 	// for last entry
 	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp)
+
+	// If an error occured when validating the transaction
 	if err != nil {
+		// Return it
 		return
 	}
 
-	// If this datastore should be cached
 	var updatedDataCache *VarMap
 
+	// If this datastore should be cached
 	if this.IsCached() {
 		// Get an updated data cache value that would replace the old cache value
 		// once all write operations have successfuly completed
 		updatedDataCache, err = this.CreateUpdatedDataCache(bytes.NewReader(transactionBytes), 0, int64(len(transactionBytes)))
+
+		// If an error occurred when creating the updated cache value
 		if err != nil {
+			// Return the error
 			return
 		}
 	}
 
 	// Close the file and release all resources
 	err = this.Release()
+
+	// If an error occurred when releasing the datastore
 	if err != nil {
+		// Return the error
 		return
 	}
 
 	// Reset compaction state file (all of its values would be reset to zero)
 	err = this.resetCompactionState()
+
+	// If an error occured when reseting the compaction state file
 	if err != nil {
+		// Return the error
 		return
 	}
 
 	// Safely replace file the datastore file with a creation entry and the new transaction as content
 	err = ReplaceFileSafely(this.filePath, CreateNewDatastoreReaderFromBytes(transactionBytes, commitTimestamp))
+
+	// If an error occured when replacing the file
 	if err != nil {
+		// Return the error
 		return
 	}
 
@@ -564,7 +616,7 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 		// Return with no error
 		return false, nil
 	}
-	
+
 	// Prepare for compaction: clear compaction state file
 	this.resetCompactionState()
 
@@ -587,7 +639,7 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 
 	// Store the updated state in the file
 	err = this.storeCompactionState()
-	
+
 	// If an error has occurred when storing the compaction state
 	if err != nil {
 		// Return the error
@@ -596,7 +648,7 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 
 	// Release datastore resources
 	err = this.Release()
-	
+
 	// If an error has occurred when releasing the datastore
 	if err != nil {
 		// Return the error
@@ -710,7 +762,7 @@ func (this *DatastoreOperationsEntry) Release() (err error) {
 
 	// Clear file object
 	this.file = nil
-	
+
 	// Clear index
 	this.index = nil
 
@@ -729,7 +781,7 @@ func (this *DatastoreOperationsEntry) Release() (err error) {
 func (this *DatastoreOperationsEntry) Destroy() (err error) {
 	// Release the datastore
 	err = this.Release()
-	
+
 	// If an error occurred when releasing the datastore
 	if err != nil {
 		// Return the error
@@ -741,7 +793,7 @@ func (this *DatastoreOperationsEntry) Destroy() (err error) {
 
 	// Delete the datastore file
 	err = DeleteFileSafely(this.filePath)
-	
+
 	// If an error occurred during the operation
 	if err != nil {
 		// Return the error
@@ -773,7 +825,7 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 		return
 	}
 
-	// Get safe truncation size
+	// Scan the file to get a safe truncation size
 	truncatedSize, err := FindSafeTruncationSize(NewPrefetchingReaderAt(this.file), fileSize)
 
 	// If an error occurred when checking for a truncation size
@@ -785,7 +837,20 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 	// If the truncated datastore size is equal to the current size of the datastore
 	if truncatedSize == fileSize {
 		// No need to repair anything
-		this.parentServer.Log(fmt.Sprintf("No need to repair datastore '%s'", this.name), 1)
+		this.parentServer.Log(fmt.Sprintf("No need to repair datastore '%s'.", this.name), 1)
+		return
+	}
+
+	// Create a backup copy of the corrupted datastore
+	backupFilePath := fmt.Sprintf("%s.corrupted-%d", this.filePath, MonoUnixTimeMicro())
+	err = ReplaceFileSafely(backupFilePath, this.file)
+
+	// If an error occurred when creating a backup file
+	if err != nil {
+		// Log a message
+		this.parentServer.Log(fmt.Sprintf("Error while creating a backup of corrupted datastore '%s': %s.", this.name, err), 1)
+
+		// Return the error
 		return
 	}
 
@@ -795,17 +860,17 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 	// If an error occurred when truncating the file
 	if err != nil {
 		// Log a message
-		this.parentServer.Log(fmt.Sprintf("Error while attempting roll-back of datastore '%s'", this.name), 1)
-		
+		this.parentServer.Log(fmt.Sprintf("Error while truncating datastore '%s': %s", this.name, err), 1)
+
 		// Return the error
 		return
 	}
-	
+
 	// Log a message
-	this.parentServer.Log(fmt.Sprintf("Truncated datastore '%s' from %d to %d bytes", this.name, fileSize, truncatedSize), 1)
+	this.parentServer.Log(fmt.Sprintf("Truncated datastore '%s' from %d to %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, fileSize, truncatedSize, backupFilePath), 1)
 
 	// Try recreating the index up to the truncated size
-	this.index = NewDatastoreIndex()
+	this.index = NewDatastoreIndexWithFullChecksumVerification()
 	err = this.index.AddFromEntryStream(this.file, 0, truncatedSize)
 
 	// If an error occurred when recreating the index
@@ -832,7 +897,7 @@ func (this *DatastoreOperationsEntry) GetStringConfigValue(key string) (value st
 		if cachedDatastoreConfig != nil {
 			// Lookup the value for the given key
 			value, err = cachedDatastoreConfig.GetString(key)
-			
+
 			// If the key was found
 			if err == nil {
 				// Return its value
@@ -840,7 +905,7 @@ func (this *DatastoreOperationsEntry) GetStringConfigValue(key string) (value st
 			}
 		}
 	}
-	
+
 	// Otherwise, look up the key in the global configuration and return its value if found
 	return this.parentServer.GlobalConfig().GetString(key)
 }
@@ -880,7 +945,7 @@ func (this *DatastoreOperationsEntry) GetInt64ConfigValue(key string) (value int
 		if cachedDatastoreConfig != nil {
 			// Lookup the value for the given key
 			value, err = cachedDatastoreConfig.GetInt64(key)
-			
+
 			// If the key was found
 			if err == nil {
 				// Return the value
@@ -888,7 +953,7 @@ func (this *DatastoreOperationsEntry) GetInt64ConfigValue(key string) (value int
 			}
 		}
 	}
-	
+
 	// Otherwise, look up the key in the global configuration and return its value if found
 	return this.parentServer.GlobalConfig().GetInt64(key)
 }
@@ -919,7 +984,7 @@ func (this *DatastoreOperationsEntry) GetFloat64ConfigValue(key string) (value f
 func (this *DatastoreOperationsEntry) GetFileSize() (fileSize int64, err error) {
 	// Make sure the datastore is open
 	if this.file == nil {
-		return 0, DatastoreNotOpenErr
+		return 0, ErrDatastoreNotOpen
 	}
 
 	// Get the datastore file stat object
@@ -946,7 +1011,7 @@ func (this *DatastoreOperationsEntry) GetFileSize() (fileSize int64, err error) 
 func (this *DatastoreOperationsEntry) LastModifiedTime() int64 {
 	// Look up the latest update timestamp in the index
 	// Note the function would fatally error if the index is nil
-	return this.index.LatestUpdateTimestamp()
+	return this.index.LatestTimestamp()
 }
 
 // Checks if this is a configuration datastore.
@@ -1006,35 +1071,4 @@ func (this *DatastoreOperationsEntry) GetColisionFreeTimestamp() (timestamp int6
 	}
 
 	return
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-/// Construction and global operations
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Constructs a new datastore object.
-func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *DatastoreOperationsEntry {
-	return &DatastoreOperationsEntry{
-		parentServer: parentServer,
-
-		name:                datastoreName,
-		filePath:            parentServer.startupOptions.StoragePath + "/" + datastoreName,
-		file:                nil,
-		initializationMutex: &sync.Mutex{},
-		flushMutex:          &sync.Mutex{},
-		index:               nil,
-		compactionState:     nil,
-		updateNotifier:      NewDatastoreUpdateNotifier(),
-		configDatastore:     nil,
-
-		dataCache:   nil,
-		rateLimiter: NewRequestRateLimiter(),
-	}
-}
-
-// Datastore compaction state struct type.
-type DatastoreCompactionState struct {
-	LastCompactionCheckTime       int64
-	LastCompactionCheckSize       int64
-	LastCompactionCheckUnusedSize int64
 }

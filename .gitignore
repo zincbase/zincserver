@@ -1,5 +1,3 @@
 SyncToy*
 .vscode
-backup.cmd
-test.cmd
-bench.cmd
+*.cmd

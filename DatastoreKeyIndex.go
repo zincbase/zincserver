@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha1"
 	"io"
 	"sort"
 )
@@ -17,7 +16,7 @@ func NewDatastoreKeyIndex() *DatastoreKeyIndex {
 }
 
 func (this *DatastoreKeyIndex) AddFromEntryStream(entryStream io.ReaderAt, startOffset int64, endOffset int64) error {
-	next := NewEntryStreamIterator(entryStream, startOffset, endOffset, false)
+	next := NewEntryStreamIterator(entryStream, startOffset, endOffset)
 
 	for {
 		iteratorResult, err := next()
@@ -46,11 +45,6 @@ func (this *DatastoreKeyIndex) Set(key []byte, startOffset int64, endOffset int6
 func (this *DatastoreKeyIndex) Get(key []byte) (result Range, exists bool) {
 	result, exists = this.keyIndex[SHA1(key)]
 	return
-}
-
-func SHA1(data []byte) string {
-	hash := sha1.New()
-	return string(hash.Sum(data))
 }
 
 func (this *DatastoreKeyIndex) GetCompactedRanges(readOffset int64, consolidate bool) RangeList {

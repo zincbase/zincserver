@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	//"strconv"
+	"encoding/binary"
 	"io"
 )
 
-const PrimaryHeaderSize = 32
+const PrimaryHeaderSize = 40
 
 type Entry struct {
 	PrimaryHeader        *EntryPrimaryHeader
@@ -17,15 +18,17 @@ type Entry struct {
 }
 
 type EntryPrimaryHeader struct {
-	TotalSize           int64  // 0..7
-	UpdateTime          int64  // 8..15
-	CommitTime          int64  // 16..23
-	KeySize             uint16 // 24..25
-	KeyFormat           uint8  // 26
-	ValueFormat         uint8  // 27
-	EncryptionMethod    uint8  // 28
-	Flags               uint8  // 29
-	SecondaryHeaderSize uint16 // 30..31 For future use. Secondary headers are currently ignored.
+	TotalSize             int64  // [0:8]
+	UpdateTime            int64  // [8:16]
+	CommitTime            int64  // [16:24]
+	KeySize               uint16 // [24:26]
+	KeyFormat             uint8  // [26]
+	ValueFormat           uint8  // [27]
+	EncryptionMethod      uint8  // [28]
+	Flags                 uint8  // [29]
+	SecondaryHeaderSize   uint16 // [30:32]
+	PrimaryHeaderChecksum uint32 // [32:36] CRC32C checksum of the primary header (bytes [0:32] only)
+	PayloadChecksum       uint32 // [36:30] CRC32C checksum of the rest of the entry (bytes [40:TotalSize])
 }
 
 const (
@@ -90,6 +93,20 @@ func SerializeEntry(entry *Entry) (serializedEntry []byte) {
 	return
 }
 
+func AddChecksumsToSerializedEntry(serializedEntry []byte) {
+	// Calculate primary header checksum (this include only bytes 0..32 of the header, the rest is skipped)
+	primaryHeaderChecksum := CRC32C(serializedEntry[0:32])
+
+	// Add the primary header checksum to the serialized entry
+	binary.LittleEndian.PutUint32(serializedEntry[32:36], primaryHeaderChecksum)
+
+	// Calculate the payload's checksum
+	payloadChecksum := CRC32C(serializedEntry[40:])
+
+	// Add the payload checksum to the serialized entry
+	binary.LittleEndian.PutUint32(serializedEntry[36:40], payloadChecksum)
+}
+
 func SerializeJsonEntries(jsonEntries []JsonEntry) []byte {
 	entries := []Entry{}
 
@@ -116,7 +133,7 @@ func DeserializeEntryStreamBytes(entryStream []byte) ([]Entry, error) {
 }
 
 func DeserializeEntryStreamReader(source io.ReaderAt, startOffset int64, endOffset int64) ([]Entry, error) {
-	next := NewEntryStreamIterator(source, startOffset, endOffset, false)
+	next := NewEntryStreamIterator(source, startOffset, endOffset)
 
 	results := []Entry{}
 
@@ -183,11 +200,36 @@ func DeserializeEntryStreamReaderAndAppendToVarMap(source io.ReaderAt, startOffs
 ////////////////////////////////////////////////////////////////////////////////
 // Validation
 ////////////////////////////////////////////////////////////////////////////////
+func VerifyPrimaryHeaderChecksum(serializedHeader []byte) bool {
+	// Deserialize the expected checksum from the header's bytes
+	expectedChecksum := binary.LittleEndian.Uint32(serializedHeader[32:36])
+
+	// Calculate the actual checksum
+	actualChecksum := CRC32C(serializedHeader[0:32])
+
+	// Return their comparison result
+	return actualChecksum == expectedChecksum
+}
+
+func VerifyPayloadChecksum(serializedHeader []byte, payloadReader io.Reader) bool {
+	// Deserialize the expected checksum from the header's bytes
+	expectedChecksum := binary.LittleEndian.Uint32(serializedHeader[36:40])
+	
+	// Calculate the actual checksum
+	actualChecksum, err := CRC32COfReader(payloadReader)
+
+	if err != nil {
+		return false
+	}
+
+	return actualChecksum == expectedChecksum
+}
+
 func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64) error {
 	const minAllowedTimestamp int64 = 1483221600 * 1000000
 	maxAllowedTimestamp := MonoUnixTimeMicro() + (30 * 1000000)
 
-	next := NewEntryStreamIterator(bytes.NewReader(entryStream), 0, int64(len(entryStream)), false)
+	next := NewEntryStreamIterator(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
 
 	for {
 		iteratorResult, err := next()
@@ -224,7 +266,11 @@ func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64)
 			iteratorResult.PrimaryHeader.Flags |= Flag_TransactionEnd
 		}
 
+		// Update the header bytes
 		SerializePrimaryHeader(entryStream[iteratorResult.Offset:], iteratorResult.PrimaryHeader)
+
+		// Add checksums for the header and payload
+		AddChecksumsToSerializedEntry(entryStream[iteratorResult.Offset:iteratorResult.EndOffset()])
 	}
 }
 
@@ -233,6 +279,8 @@ func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64)
 ////////////////////////////////////////////////////////////////////////////////
 func CreateNewDatastoreReader(newDatastoreContentReader io.Reader, creationTimestamp int64) io.Reader {
 	creationEntry := SerializeEntry(&Entry{&EntryPrimaryHeader{UpdateTime: creationTimestamp, CommitTime: creationTimestamp, Flags: Flag_TransactionEnd | Flag_CreationEvent}, []byte{}, []byte{}, []byte{}})
+
+	AddChecksumsToSerializedEntry(creationEntry)
 	return io.MultiReader(bytes.NewReader(creationEntry), newDatastoreContentReader)
 }
 

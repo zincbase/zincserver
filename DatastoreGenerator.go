@@ -28,22 +28,22 @@ func GenerateRandomEntryStreamBytes(entryCount int, keySize int, valueSize int, 
 		var entry *Entry
 
 		switch entryType {
-			case "randomPathEntry":
-				entry = getRandomPathEntry(keySize, valueSize)
-			case "randomPathEntryWithBinaryValue":
-				entry = getRandomPathEntryWithBinaryValue(keySize, valueSize)
-			case "randomUTF8Entry":
-				entry = getRandomUtf8Entry(keySize, valueSize)
-			case "randomBinaryEntry":
-				entry = getRandomBinaryEntry(keySize, valueSize)
-			case "randomAlphanumericEntry":
-				entry = getRandomAlphanumericEntry(keySize, valueSize)
-			case "randomJSONEntry":
-				entry = getRandomJsonEntry(keySize, valueSize)
-			default:
-				panic("Invalid entry type requested: '" + entryType + "'")
+		case "randomPathEntry":
+			entry = getRandomPathEntry(keySize, valueSize)
+		case "randomPathEntryWithBinaryValue":
+			entry = getRandomPathEntryWithBinaryValue(keySize, valueSize)
+		case "randomUTF8Entry":
+			entry = getRandomUtf8Entry(keySize, valueSize)
+		case "randomBinaryEntry":
+			entry = getRandomBinaryEntry(keySize, valueSize)
+		case "randomAlphanumericEntry":
+			entry = getRandomAlphanumericEntry(keySize, valueSize)
+		case "randomJSONEntry":
+			entry = getRandomJsonEntry(keySize, valueSize)
+		default:
+			panic("Invalid entry type requested: '" + entryType + "'")
 		}
-		
+
 		writer.Write(SerializeEntry(entry))
 	}
 
@@ -59,6 +59,7 @@ func getRandomUtf8Entry(keySize int, valueSize int) (result *Entry) {
 			CommitTime:  MonoUnixTimeMicro(),
 			KeyFormat:   DataFormat_UTF8,
 			ValueFormat: DataFormat_UTF8,
+			Flags:       Flag_TransactionEnd,
 		},
 	}
 }
@@ -72,6 +73,7 @@ func getRandomBinaryEntry(keySize int, valueSize int) (result *Entry) {
 			CommitTime:  MonoUnixTimeMicro(),
 			KeyFormat:   DataFormat_Binary,
 			ValueFormat: DataFormat_Binary,
+			Flags:       Flag_TransactionEnd,
 		},
 	}
 
@@ -87,6 +89,7 @@ func getRandomAlphanumericEntry(keySize int, valueSize int) (result *Entry) {
 			CommitTime:  MonoUnixTimeMicro(),
 			KeyFormat:   DataFormat_UTF8,
 			ValueFormat: DataFormat_UTF8,
+			Flags:       Flag_TransactionEnd,
 		},
 	}
 
@@ -102,6 +105,7 @@ func getRandomJsonEntry(keySize int, valueSize int) (result *Entry) {
 			CommitTime:  MonoUnixTimeMicro(),
 			KeyFormat:   DataFormat_JSON,
 			ValueFormat: DataFormat_JSON,
+			Flags:       Flag_TransactionEnd,
 		},
 	}
 
@@ -117,6 +121,7 @@ func getRandomPathEntry(keySize int, valueSize int) (result *Entry) {
 			CommitTime:  MonoUnixTimeMicro(),
 			KeyFormat:   DataFormat_JSON,
 			ValueFormat: DataFormat_JSON,
+			Flags:       Flag_TransactionEnd,
 		},
 	}
 
@@ -132,6 +137,7 @@ func getRandomPathEntryWithBinaryValue(keySize int, valueSize int) (result *Entr
 			CommitTime:  MonoUnixTimeMicro(),
 			KeyFormat:   DataFormat_JSON,
 			ValueFormat: DataFormat_Binary,
+			Flags:       Flag_TransactionEnd,
 		},
 	}
 

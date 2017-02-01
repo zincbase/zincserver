@@ -4,12 +4,14 @@ import (
 	"errors"
 )
 
-var DatastoreNotOpenErr = errors.New("Datastore is not open")
+var ErrDatastoreNotOpen = errors.New("Datastore is not open")
 
-type DatastoreTooLargeErr struct {
+type ErrDatastoreTooLarge struct {
 	message string
 }
 
-func (this DatastoreTooLargeErr) Error() string {
+func (this ErrDatastoreTooLarge) Error() string {
 	return this.message
 }
+
+var ErrCorruptedEntry = errors.New("Invalid entry checksum detected. This may be due to data corruption.")

@@ -8,8 +8,10 @@ func Benchmark_EntrySerializer(bench *testing.B) {
 	bench.Run("Serialization", func(bench *testing.B) {
 		testEntry := Entry{
 			PrimaryHeader: &EntryPrimaryHeader{
-				UpdateTime: 2345345222523423132,
-				CommitTime: 2345345222523423423,
+				UpdateTime:            2345345222523423132,
+				CommitTime:            2345345222523423423,
+				PrimaryHeaderChecksum: 3316190138, // Bogus checksum for testing only
+				PayloadChecksum:       2042592394, // Bogus checksum for testing only
 			},
 			SecondaryHeaderBytes: []byte("Secondary Header"),
 			Key:                  []byte("Test Key"),
@@ -25,8 +27,10 @@ func Benchmark_EntrySerializer(bench *testing.B) {
 	bench.Run("Deserialization", func(bench *testing.B) {
 		testEntry := Entry{
 			PrimaryHeader: &EntryPrimaryHeader{
-				UpdateTime: 2345345222523423132,
-				CommitTime: 2345345222523423423,
+				UpdateTime:            2345345222523423132,
+				CommitTime:            2345345222523423423,
+				PrimaryHeaderChecksum: 3316190138, // Bogus checksum for testing only
+				PayloadChecksum:       2042592394, // Bogus checksum for testing only
 			},
 			SecondaryHeaderBytes: []byte("Secondary Header"),
 			Key:                  []byte("Test Key"),

@@ -124,7 +124,8 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		if err == io.ErrUnexpectedEOF || err == ErrCorruptedEntry {
 			this.parentServer.Log(fmt.Sprintf("An incomplete or corrupted transcacion found in datastore '%s'. Attempting roll-back..", this.name), 1)
 
-			// Attempt to roll back to last succesful transaction
+			// Attempt to roll back to last succesful transaction, this would also attempt to
+			// reload the index if the repair operation has succeeded
 			err = this.TryRollingBackToLastSuccessfulTransaction()
 
 			// If an error occurred when rolling back
@@ -154,48 +155,18 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		}
 	}
 
-	// Check if the datastore file is empty. I.e. it doesn't have a head entry.
-	// Note this could have been caused by a previous truncation to a 0 size.
-	if fileSize == 0 {
-		// Log message
-		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has length 0. Adding head entry..", this.name), 1)
-		// Reset the file with a valid creation entry
-		_, err = io.Copy(this.file, CreateNewDatastoreReaderFromBytes([]byte{}, MonoUnixTimeMicro()))
-
-		// If some error occured while trying to reset the file
-		if err != nil {
-			// Release and return the error
-			this.Release()
-			return
-		}
-
-		// Get file size again
-		fileSize, err = this.GetFileSize()
-
-		// If some error occured while trying to get the file size
-		if err != nil {
-			// Release and return the error
-			this.Release()
-			return
-		}
-
-		// Recreate index
-		this.index = NewDatastoreIndexWithFullChecksumVerification()
-		err = this.index.AddFromEntryStream(this.file, 0, fileSize)
-
-		// If some error occured while trying to recreate the index
-		if err != nil {
-			// Release and return the error
-			this.Release()
-			return
-		}
-	}
-
 	// Load head entry
 	err = this.loadHeadEntry()
 
 	// If some error occured while loading the head entry
 	if err != nil {
+		// Log a message
+		if err == io.ErrUnexpectedEOF || err == ErrInvalidHeadEntry || err == ErrCorruptedEntry {
+			this.parentServer.Log(fmt.Sprintf("Datastore '%s' cannot be opened as it has an invalid or corrupted head entry", this.name), 1)
+		} else {
+			this.parentServer.Log(fmt.Sprintf("Datastore '%s' cannot be opened due to an unexpected error while trying to load its head entry: %s", this.name, err), 1)
+		}
+
 		// Release and return the error
 		this.Release()
 		return
@@ -737,7 +708,7 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 	}
 
 	// Scan the file to get a safe truncation size
-	truncatedSize, err := FindSafeTruncationSize(NewPrefetchingReaderAt(this.file), fileSize)
+	newSize, err := FindSafeTruncationSize(NewPrefetchingReaderAt(this.file), fileSize)
 
 	// If an error occurred when checking for a truncation size
 	if err != nil {
@@ -746,7 +717,7 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 	}
 
 	// If the truncated datastore size is equal to the current size of the datastore
-	if truncatedSize == fileSize {
+	if newSize == fileSize {
 		// No need to repair anything
 		this.parentServer.Log(fmt.Sprintf("No need to repair datastore '%s'.", this.name), 1)
 		return
@@ -766,7 +737,7 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 	}
 
 	// Truncate the datastore file
-	err = this.file.Truncate(truncatedSize)
+	err = this.file.Truncate(newSize)
 
 	// If an error occurred when truncating the file
 	if err != nil {
@@ -777,12 +748,43 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 		return
 	}
 
-	// Log a message
-	this.parentServer.Log(fmt.Sprintf("Truncated datastore '%s' from %d to %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, fileSize, truncatedSize, backupFilePath), 1)
+	// Seek the files to its new end offset
+	_, err = this.file.Seek(newSize, 0)
 
-	// Try recreating the index up to the truncated size
+	// If an error occurred while seeking the file
+	if err != nil {
+		// Log a message
+		this.parentServer.Log(fmt.Sprintf("Error while truncating datastore '%s': %s", this.name, err), 1)
+
+		// Return the error
+		return
+	}
+
+	// Log a message
+	this.parentServer.Log(fmt.Sprintf("Truncated datastore '%s' from %d to %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, fileSize, newSize, backupFilePath), 1)
+
+	// Check if the datastore file is empty
+	if fileSize == 0 {
+		// Log message
+		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has length 0. Adding head entry..", this.name), 1)
+
+		// Add a new head entry to the file
+		_, err = io.Copy(this.file, CreateNewDatastoreReaderFromBytes([]byte{}, MonoUnixTimeMicro()))
+
+		// If some error occured while trying to reset the file
+		if err != nil {
+			// Release and return the error
+			this.Release()
+			return
+		}
+
+		// Set the new size to the size of the head entry
+		newSize = HeadEntrySize
+	}
+
+	// Try recreating the index up to the new size
 	this.index = NewDatastoreIndexWithFullChecksumVerification()
-	err = this.index.AddFromEntryStream(this.file, 0, truncatedSize)
+	err = this.index.AddFromEntryStream(this.file, 0, newSize)
 
 	// If an error occurred when recreating the index
 	if err != nil {
@@ -805,18 +807,26 @@ func (this *DatastoreOperationsEntry) loadHeadEntry() error {
 	// Iterate once
 	iterationResult, err := iterate()
 
-	// If an error occurred while iterating
+	// If an error occurred while iterating or the iterator has completed
 	if err != nil {
 		// Return the error
 		return err
 	}
 
-	// If the first entry is corrupt or isn't a valid head entry
-	if !iterationResult.VerifyAllChecksums() ||
-		!iterationResult.IsHeadEntry() ||
-		iterationResult.ValueSize() != HeadEntryValueSize {
+	if iterationResult == nil {
+		return ErrInvalidHeadEntry
+	}
+
+	// If the first entry is corrupt
+	if !iterationResult.VerifyAllChecksums() {
 		// Return a corrupted entry error
 		return ErrCorruptedEntry
+	}
+
+	// If the first entry isn't a head entry
+	if !iterationResult.VerifyValidHeadEntry() {
+		// Return an invalid head entry error
+		return ErrInvalidHeadEntry
 	}
 
 	// Read the value of the head entry

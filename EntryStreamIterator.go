@@ -172,11 +172,6 @@ func (this *EntryStreamIteratorResult) HasTransactionEndFlag() bool {
 	return this.PrimaryHeader.Flags&Flag_TransactionEnd == Flag_TransactionEnd
 }
 
-// Is this a head entry?
-func (this *EntryStreamIteratorResult) IsHeadEntry() bool {
-	return this.KeySize() == 0
-}
-
 // Verify the primary header's checksum
 func (this *EntryStreamIteratorResult) VerifyPrimaryHeaderChecksum() bool {
 	return VerifyPrimaryHeaderChecksum(this.PrimaryHeaderBytes)
@@ -190,4 +185,26 @@ func (this *EntryStreamIteratorResult) VerifyPayloadChecksum() bool {
 // Verify all checksums
 func (this *EntryStreamIteratorResult) VerifyAllChecksums() bool {
 	return this.VerifyPrimaryHeaderChecksum() && this.VerifyPayloadChecksum()
+}
+
+// Is this supposed to be a head entry?
+func (this *EntryStreamIteratorResult) IsHeadEntry() bool {
+	return this.KeySize() == 0
+}
+
+// Verify as valid head entry
+func (this *EntryStreamIteratorResult) VerifyValidHeadEntry() bool {
+	return  this.Size == HeadEntrySize && 
+			this.KeySize() == 0 &&
+			this.ValueSize() == HeadEntryValueSize
+}
+
+// Get update time
+func (this *EntryStreamIteratorResult) UpdateTime() int64 {
+	return this.PrimaryHeader.UpdateTime
+}
+
+// Get commit time
+func (this *EntryStreamIteratorResult) CommitTime() int64 {
+	return this.PrimaryHeader.CommitTime
 }

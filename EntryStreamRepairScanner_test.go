@@ -10,7 +10,7 @@ import (
 var _ = Describe("EntryStreamRepairer", func() {
 	It("Returns a truncated size for an incomplete entry stream", func() {
 		testEntries := []*Entry{
-			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_CreationEvent | Flag_TransactionEnd}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Secondary header 2"), []byte("Key2"), []byte("Value2")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Secondary header 3"), []byte("Key1"), []byte("Value3")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Secondary header 4"), []byte("Key1"), []byte("Value4")},
@@ -27,7 +27,7 @@ var _ = Describe("EntryStreamRepairer", func() {
 			AddChecksumsToSerializedEntry(serializedEntries[i])
 
 			cumulativeLength += len(serializedEntries[i])
-			cumulativeLengths[i] = int64(cumulativeLength)			
+			cumulativeLengths[i] = int64(cumulativeLength)
 		}
 
 		entryStream := ConcatSliceList(serializedEntries)
@@ -57,9 +57,9 @@ var _ = Describe("EntryStreamRepairer", func() {
 		testTruncationSize(cumulativeLengths[5], cumulativeLengths[5])
 	})
 
-	It("Returns a correct truncated size for a randomly corrupted entry stream", func() {	
+	It("Returns a correct truncated size for a randomly corrupted entry stream", func() {
 		testEntries := []*Entry{
-			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_CreationEvent | Flag_TransactionEnd}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Secondary header 2"), []byte("Key2"), []byte("Value2")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Secondary header 3"), []byte("Key1"), []byte("Value3")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte("Secondary header 4"), []byte("Key1"), []byte("Value4")},
@@ -79,7 +79,6 @@ var _ = Describe("EntryStreamRepairer", func() {
 			cumulativeLengths[i] = cumulativeLength
 		}
 
-
 		entryStream := ConcatSliceList(serializedEntries)
 		random := rand.New(rand.NewSource(1234))
 
@@ -96,7 +95,7 @@ var _ = Describe("EntryStreamRepairer", func() {
 
 			for _, cumulativeLength := range cumulativeLengths {
 				if cumulativeLength > corruptedCharacterPosition {
-					break;
+					break
 				}
 
 				expectedTruncationSize = cumulativeLength

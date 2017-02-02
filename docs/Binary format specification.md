@@ -1,6 +1,7 @@
 # Binary format specification
 
 ## Overview
+
 The 'raw' or binary entry stream is the internal format used natively in datastore files, raw server responses and WebSocket message payloads. The format is designed to allow future evolution while still maintaining a baseline level of common functionality to ensure both backwards and forwards compatibility.  
 
 It is structured in the following way:
@@ -64,7 +65,6 @@ End-to-end encryption is meant to _complement_ an existing layer of security at 
 The currently used flags are:
 
 * Bit `0` set: Transaction end marker - Marks the end of a transaction.
-* Bit `1` set: Creation event - Signifies the creation of a new datastore. Instructs the reader to erase any previous entry data. This flag can only be set by the server, any transaction containing an entry that has it in its header would be rejected.
 * Bits `1..7`: <reserved>
 
 ## Checksums

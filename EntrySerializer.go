@@ -33,7 +33,6 @@ type EntryPrimaryHeader struct {
 
 const (
 	Flag_TransactionEnd uint8 = 1
-	Flag_CreationEvent  uint8 = 2
 	DataFormat_Binary   uint8 = 0
 	DataFormat_UTF8     uint8 = 1
 	DataFormat_JSON     uint8 = 2
@@ -214,7 +213,7 @@ func VerifyPrimaryHeaderChecksum(serializedHeader []byte) bool {
 func VerifyPayloadChecksum(serializedHeader []byte, payloadReader io.Reader) bool {
 	// Deserialize the expected checksum from the header's bytes
 	expectedChecksum := binary.LittleEndian.Uint32(serializedHeader[36:40])
-	
+
 	// Calculate the actual checksum
 	actualChecksum, err := CRC32COfReader(payloadReader)
 
@@ -272,18 +271,4 @@ func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64)
 		// Add checksums for the header and payload
 		AddChecksumsToSerializedEntry(entryStream[iteratorResult.Offset:iteratorResult.EndOffset()])
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Datastore creation
-////////////////////////////////////////////////////////////////////////////////
-func CreateNewDatastoreReader(newDatastoreContentReader io.Reader, creationTimestamp int64) io.Reader {
-	creationEntry := SerializeEntry(&Entry{&EntryPrimaryHeader{UpdateTime: creationTimestamp, CommitTime: creationTimestamp, Flags: Flag_TransactionEnd | Flag_CreationEvent}, []byte{}, []byte{}, []byte{}})
-
-	AddChecksumsToSerializedEntry(creationEntry)
-	return io.MultiReader(bytes.NewReader(creationEntry), newDatastoreContentReader)
-}
-
-func CreateNewDatastoreReaderFromBytes(newDatastoreContentBytes []byte, creationTimestamp int64) io.Reader {
-	return CreateNewDatastoreReader(bytes.NewReader(newDatastoreContentBytes), creationTimestamp)
 }

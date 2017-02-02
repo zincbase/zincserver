@@ -24,8 +24,8 @@ func NewEntryStreamIterator(source io.ReaderAt, startOffset int64, endOffset int
 		if readOffset == endOffset {
 			// Return an empty result with no error
 			return nil, nil
-		// Otherwise if the primary header end offset is greater than the streams's end offset
-		} else if readOffset + PrimaryHeaderSize > endOffset {
+			// Otherwise if the primary header end offset is greater than the streams's end offset
+		} else if readOffset+PrimaryHeaderSize > endOffset {
 			// Return an empty result with an unexpected end of stream error
 			return nil, io.ErrUnexpectedEOF
 		}
@@ -75,13 +75,13 @@ func NewEntryStreamIterator(source io.ReaderAt, startOffset int64, endOffset int
 // The entry stream iterator result object
 type EntryStreamIteratorResult struct {
 	// The source stream
-	source             io.ReaderAt
+	source io.ReaderAt
 	// The entry's offset relative to the stream
-	Offset             int64
+	Offset int64
 	// The entry's size
-	Size               int64
+	Size int64
 	// The primary header
-	PrimaryHeader      *EntryPrimaryHeader
+	PrimaryHeader *EntryPrimaryHeader
 	// The serialized primary header
 	PrimaryHeaderBytes []byte
 }
@@ -172,9 +172,9 @@ func (this *EntryStreamIteratorResult) HasTransactionEndFlag() bool {
 	return this.PrimaryHeader.Flags&Flag_TransactionEnd == Flag_TransactionEnd
 }
 
-// Is this entry a creation event?
-func (this *EntryStreamIteratorResult) IsCreationEvent() bool {
-	return this.PrimaryHeader.Flags&Flag_CreationEvent == Flag_CreationEvent
+// Is this a head entry?
+func (this *EntryStreamIteratorResult) IsHeadEntry() bool {
+	return this.KeySize() == 0
 }
 
 // Verify the primary header's checksum
@@ -185,4 +185,9 @@ func (this *EntryStreamIteratorResult) VerifyPrimaryHeaderChecksum() bool {
 // Verify the payload's checksum
 func (this *EntryStreamIteratorResult) VerifyPayloadChecksum() bool {
 	return VerifyPayloadChecksum(this.PrimaryHeaderBytes, this.CreatePayloadReader())
+}
+
+// Verify all checksums
+func (this *EntryStreamIteratorResult) VerifyAllChecksums() bool {
+	return this.VerifyPrimaryHeaderChecksum() && this.VerifyPayloadChecksum()
 }

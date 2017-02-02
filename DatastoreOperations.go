@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -10,14 +9,8 @@ import (
 	"strings"
 	"sync"
 	//"log"
+	"errors"
 )
-
-// Datastore compaction state struct type.
-type DatastoreCompactionState struct {
-	LastCompactionCheckTime       int64
-	LastCompactionCheckSize       int64
-	LastCompactionCheckUnusedSize int64
-}
 
 // The datastore operation structure type.
 type DatastoreOperationsEntry struct {
@@ -46,8 +39,11 @@ type DatastoreOperationsEntry struct {
 	// A flag that signifies if flush operation is currently scheduled
 	flushScheduled bool
 
-	// Cache object holding the compaction metadata file content
-	compactionState *DatastoreCompactionState
+	// Cached head entry value
+	headEntryValue *HeadEntryValue
+
+	// Datastore creation time
+	creationTime int64
 
 	// A cache object containing the datastore content in parsed form.
 	// This is currently used only to cache configuration datastores
@@ -82,7 +78,8 @@ func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *Da
 		initializationMutex: &sync.Mutex{},
 		flushMutex:          &sync.Mutex{},
 		index:               nil,
-		compactionState:     nil,
+		headEntryValue:      nil,
+		creationTime:        0,
 		updateNotifier:      NewDatastoreUpdateNotifier(),
 		configDatastore:     nil,
 
@@ -91,7 +88,7 @@ func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *Da
 	}
 }
 
-// Loads the datastore, if needed.
+// Loads the datastore, if needed
 func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 	// Lock using initialization mutex
 	this.initializationMutex.Lock()
@@ -157,11 +154,11 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		}
 	}
 
-	// Check if the datastore file is empty. I.e. it doesn't have a creation entry.
+	// Check if the datastore file is empty. I.e. it doesn't have a head entry.
 	// Note this could have been caused by a previous truncation to a 0 size.
 	if fileSize == 0 {
 		// Log message
-		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has length 0. Adding creation entry..", this.name), 1)
+		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has length 0. Adding head entry..", this.name), 1)
 		// Reset the file with a valid creation entry
 		_, err = io.Copy(this.file, CreateNewDatastoreReaderFromBytes([]byte{}, MonoUnixTimeMicro()))
 
@@ -192,6 +189,16 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 			this.Release()
 			return
 		}
+	}
+
+	// Load head entry
+	err = this.loadHeadEntry()
+
+	// If some error occured while loading the head entry
+	if err != nil {
+		// Release and return the error
+		this.Release()
+		return
 	}
 
 	// If this is a configuration datastore, cache its content
@@ -404,15 +411,6 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 		return
 	}
 
-	// Reset compaction state file (all of its values would be reset to zero)
-	err = this.resetCompactionState()
-
-	// If an error occured when reseting the compaction state file
-	if err != nil {
-		// Return the error
-		return
-	}
-
 	// Safely replace file the datastore file with a creation entry and the new transaction as content
 	err = ReplaceFileSafely(this.filePath, CreateNewDatastoreReaderFromBytes(transactionBytes, commitTimestamp))
 
@@ -574,20 +572,14 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 		return false, nil
 	}
 
-	// Ensure compaction state is loaded
-	err := this.loadCompactionStateIfNeeded()
-	if err != nil {
-		return false, err
-	}
-
 	// Continue only if file size has grown a sufficient amount since last check
-	if float64(currentSize) < float64(this.compactionState.LastCompactionCheckSize)*compactionMinGrowthRatio {
+	if float64(currentSize) < float64(this.headEntryValue.LastCompactionCheckSize)*compactionMinGrowthRatio {
 		return false, nil
 	}
 
 	// Create a key index and add all entries to it
 	keyIndex := NewDatastoreKeyIndex()
-	err = keyIndex.AddFromEntryStream(NewPrefetchingReaderAt(this.file), 0, currentSize)
+	err := keyIndex.AddFromEntryStream(NewPrefetchingReaderAt(this.file), 0, currentSize)
 	if err != nil {
 		return false, err
 	}
@@ -596,18 +588,18 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 	compactedSize := keyIndex.GetCompactedSize()
 	unusedSize := currentSize - compactedSize
 
-	// Continue only if compacted size is above threshold for a file rewrite
+	// If the compacted size is below the threshold for a file rewrite
 	if float64(unusedSize)/float64(currentSize) < compactionMinUnusedSizeRatio {
 
-		// Update compaction state for latest compaction check results
-		this.compactionState.LastCompactionCheckTime = MonoUnixTimeMicro()
-		this.compactionState.LastCompactionCheckSize = currentSize
-		this.compactionState.LastCompactionCheckUnusedSize = unusedSize
+		// Update the head entry for latest compaction check results
+		this.headEntryValue.LastCompactionCheckTime = MonoUnixTimeMicro()
+		this.headEntryValue.LastCompactionCheckSize = currentSize
+		this.headEntryValue.LastCompactionCheckUnusedSize = unusedSize
 
-		// Store the updated compaction state
-		err = this.storeCompactionState()
+		// Store the updated head entry
+		err = this.storeHeadEntry()
 
-		// If an error has occured while storing the updated compaction state
+		// If an error has occured while storing the updated head entry
 		if err != nil {
 			// Return the error
 			return false, err
@@ -617,30 +609,27 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 		return false, nil
 	}
 
-	// Prepare for compaction: clear compaction state file
-	this.resetCompactionState()
+	// Create a timestamp for the compacted datastore head entry
+	compactionTimestamp := MonoUnixTimeMicro()
+
+	// Create a new head entry that preserves the existing creation time
+	compactedDatastoreHeadEntry := CreateSerializedHeadEntry(&HeadEntryValue{
+		Version:                       DatastoreVersion,
+		LastCompactionTime:            compactionTimestamp,
+		LastCompactionCheckTime:       compactionTimestamp,
+		LastCompactionCheckSize:       compactedSize,
+		LastCompactionCheckUnusedSize: 0,
+	}, this.creationTime)
 
 	// Create a reader for the compacted datastore
-	compactedDatastoreReader := keyIndex.CreateReaderForCompactedRanges(this.file, 0)
+	compactedDatastoreReader := io.MultiReader(
+		bytes.NewReader(compactedDatastoreHeadEntry),
+		keyIndex.CreateReaderForCompactedRanges(this.file, HeadEntrySize))
 
 	// Rewrite the file with the compacted ranges
 	err = ReplaceFileSafely(this.filePath, compactedDatastoreReader)
 
 	// If an error occurred while rewriting the file
-	if err != nil {
-		// Return the error
-		return false, err
-	}
-
-	// Update compaction state to the compacted size
-	this.compactionState.LastCompactionCheckTime = MonoUnixTimeMicro()
-	this.compactionState.LastCompactionCheckSize = compactedSize
-	this.compactionState.LastCompactionCheckUnusedSize = 0
-
-	// Store the updated state in the file
-	err = this.storeCompactionState()
-
-	// If an error has occurred when storing the compaction state
 	if err != nil {
 		// Return the error
 		return false, err
@@ -659,84 +648,6 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 	this.parentServer.Log(fmt.Sprintf("Compacted datastore '%s' from %d to %d bytes in %dms", this.name, currentSize, compactedSize, MonoUnixTimeMilli()-startTime), 1)
 
 	return true, nil
-}
-
-// Loads and caches the compaction state file, if a cached object isn't already available.
-func (this *DatastoreOperationsEntry) loadCompactionStateIfNeeded() error {
-	// If a compaction state cache value exists
-	if this.compactionState != nil {
-		// There is no need to do anything
-		return nil
-	} else {
-		// Create a compaction state cache value
-		this.compactionState = &DatastoreCompactionState{}
-
-		// Read the compaction state file
-		fileContent, err := ReadEntireFile(this.compactionStateFilePath())
-
-		// If an error occurred when reading the file (most likely the file doesn't exist)
-		if err != nil {
-			// Return with no error
-			return nil
-		}
-
-		// Deserialize the file content from JSON
-		err = json.Unmarshal(fileContent, this.compactionState)
-
-		// If an error occurred while deserializing the file content
-		if err != nil {
-			// Reset the file
-			this.resetCompactionState()
-
-			// Return with no error
-			return nil
-		}
-
-		return nil
-	}
-}
-
-// Stores the current cached compaction state object to the compaction state file.
-func (this *DatastoreOperationsEntry) storeCompactionState() (err error) {
-	// Serialize the current compaction state cached object
-	newFileContent, err := json.Marshal(this.compactionState)
-
-	// If an error occured during the operation
-	if err != nil {
-		// Return the error
-		return
-	}
-
-	// Rewrite the compaction state file with the new state
-	err = RewriteFile(this.compactionStateFilePath(), bytes.NewReader(newFileContent), false)
-
-	return
-}
-
-// Resets the compaction state file.
-func (this *DatastoreOperationsEntry) resetCompactionState() (err error) {
-	// Clear the cached object
-	this.compactionState = &DatastoreCompactionState{}
-
-	// Store the empty state to the file
-	err = this.storeCompactionState()
-	return
-}
-
-// Deletes the compaction state file.
-func (this *DatastoreOperationsEntry) deleteCompactionStateFile() (err error) {
-	// Nullify the cached object
-	this.compactionState = nil
-
-	// Delete the file
-	err = os.Remove(this.compactionStateFilePath())
-	return
-}
-
-// Gets the compaction state file path.
-func (this *DatastoreOperationsEntry) compactionStateFilePath() string {
-	// Build the compaction state file path
-	return this.filePath + ".compactionState"
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -766,8 +677,11 @@ func (this *DatastoreOperationsEntry) Release() (err error) {
 	// Clear index
 	this.index = nil
 
-	// Clear compaction state cached object
-	this.compactionState = nil
+	// Clear cached head entry value
+	this.headEntryValue = nil
+
+	// Clear creation time
+	this.creationTime = 0
 
 	// The cached data shouldn't be cleared here
 	// Otherwise configuration would become nil every time the datastore is rewritten
@@ -787,9 +701,6 @@ func (this *DatastoreOperationsEntry) Destroy() (err error) {
 		// Return the error
 		return
 	}
-
-	// Delete the compaction state file (any error during the operation is ignored)
-	this.deleteCompactionStateFile()
 
 	// Delete the datastore file
 	err = DeleteFileSafely(this.filePath)
@@ -878,6 +789,71 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 		// Log a message
 		this.parentServer.Log(fmt.Sprintf("Failed to recreate index for datastore '%s' after repair", this.name), 1)
 	}
+
+	return
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+/// Head entry operations
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Cache the value and creation time of the entry, always located on range [0:512] of the file
+func (this *DatastoreOperationsEntry) loadHeadEntry() error {
+	// Create a new iterator for the datastore
+	iterate := NewEntryStreamIterator(this.file, 0, HeadEntrySize)
+
+	// Iterate once
+	iterationResult, err := iterate()
+
+	// If an error occurred while iterating
+	if err != nil {
+		// Return the error
+		return err
+	}
+
+	// If the first entry is corrupt or isn't a valid head entry
+	if !iterationResult.VerifyAllChecksums() ||
+		!iterationResult.IsHeadEntry() ||
+		iterationResult.ValueSize() != HeadEntryValueSize {
+		// Return a corrupted entry error
+		return ErrCorruptedEntry
+	}
+
+	// Read the value of the head entry
+	value, err := iterationResult.ReadValue()
+
+	// If an error occurred while reading the value
+	if err != nil {
+		// Return the error
+		return err
+	}
+
+	// Deserialize the head entry value and store it in its object
+	this.headEntryValue = DeserializeHeadEntryValue(value)
+
+	// Store the creation time in its object
+	this.creationTime = iterationResult.PrimaryHeader.CommitTime
+
+	return nil
+}
+
+// Persist the head entry object to disk
+func (this *DatastoreOperationsEntry) storeHeadEntry() (err error) {
+	// If the cached head entry value doesn't exist, error
+	if this.headEntryValue == nil {
+		return errors.New("No head entry is not loaded")
+	}
+
+	// If the creation time is 0, error
+	if this.creationTime == 0 {
+		return errors.New("Creation time is 0")
+	}
+
+	// Create a serialized head entry from the cached value and creation time
+	serializedHeadEntry := CreateSerializedHeadEntry(this.headEntryValue, this.creationTime)
+
+	// Write the serialized head entry to the datastore file at offset 0
+	_, err = this.file.WriteAt(serializedHeadEntry, 0)
 
 	return
 }

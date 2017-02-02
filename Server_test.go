@@ -57,9 +57,8 @@ var _ = Describe("Server", func() {
 
 		ExpectEntryArraysToBeEquivalent(returnedEntries[1:], testEntries[0:2])
 
-		Expect(returnedEntries[0].PrimaryHeader.Flags & Flag_CreationEvent).To(Equal(Flag_CreationEvent))
 		Expect(returnedEntries[0].Key).To(HaveLen(0))
-		Expect(returnedEntries[0].Value).To(HaveLen(0))
+		Expect(returnedEntries[0].Value).To(HaveLen(HeadEntryValueSize))
 	})
 
 	It("Posts and gets entries", func() {
@@ -79,9 +78,8 @@ var _ = Describe("Server", func() {
 		Expect(err).To(BeNil())
 		ExpectEntryArraysToBeEquivalent(returnedEntries[1:], testEntries[0:5])
 
-		Expect(returnedEntries[0].PrimaryHeader.Flags & Flag_CreationEvent).To(Equal(Flag_CreationEvent))
 		Expect(returnedEntries[0].Key).To(HaveLen(0))
-		Expect(returnedEntries[0].Value).To(HaveLen(0))
+		Expect(returnedEntries[0].Value).To(HaveLen(HeadEntryValueSize))
 	})
 
 	It("Puts, posts and gets entries after timestamp", func() {

@@ -10,7 +10,7 @@ import (
 var _ = Describe("EntryStreamIterator", func() {
 	It("Iterates over a stream containing several entries ", func() {
 		testEntries := []*Entry{
-			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_CreationEvent}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryPrimaryHeader{CommitTime: 2}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Secondary header 2"), []byte("Key2"), []byte("Value2")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Secondary header 3"), []byte("Key1"), []byte("Value3")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Secondary header 4"), []byte("Key1"), []byte("Value4")},
@@ -66,9 +66,7 @@ var _ = Describe("EntryStreamIterator", func() {
 			Expect(err).To(BeNil())
 			Expect(secondaryHeaderBytes).To(Equal(entry.SecondaryHeaderBytes))
 
-			if i == 0 {
-				Expect(iteratorResult.IsCreationEvent()).To(BeTrue())
-			} else if i == len(testEntries)-1 {
+			if i == len(testEntries)-1 {
 				Expect(iteratorResult.HasTransactionEndFlag()).To(BeTrue())
 			}
 		}

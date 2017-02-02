@@ -21,18 +21,28 @@ type HeadEntryValue struct {
 ////////////////////////////////////////////////////////////////////////////////
 // Head entry serialization
 ////////////////////////////////////////////////////////////////////////////////
+
+// Create a serialized head entry, given a value object and timestamp, to be
+// used as a creation timestamp
 func CreateSerializedHeadEntry(value *HeadEntryValue, timestamp int64) (serializedHeadEntry []byte) {
+	// Serialize the given head entry
 	serializedHeadEntry = SerializeEntry(CreateHeadEntry(value, timestamp))
+
+	// Add checksums to the serialized entry
 	AddChecksumsToSerializedEntry(serializedHeadEntry)
 
 	return
 }
 
+// Create a head entry object, given a value object and a timestamp
 func CreateHeadEntry(value *HeadEntryValue, timestamp int64) *Entry {
+	// If no timestamp was given
 	if timestamp <= 0 {
+		// Take the current time
 		timestamp = MonoUnixTimeMicro()
 	}
 
+	// Return an entry with the timestamp and serialized value
 	return &Entry{
 		PrimaryHeader:        &EntryPrimaryHeader{ UpdateTime: timestamp, CommitTime: timestamp, Flags: Flag_TransactionEnd},
 		SecondaryHeaderBytes: []byte{},
@@ -41,6 +51,7 @@ func CreateHeadEntry(value *HeadEntryValue, timestamp int64) *Entry {
 	}
 }
 
+// Serialize the value of a head entry
 func SerializeHeadEntryValue(value *HeadEntryValue) (serializedMetadataEntryValue []byte) {
 	serializedMetadataEntryValue = make([]byte, HeadEntryValueSize)
 
@@ -56,6 +67,8 @@ func SerializeHeadEntryValue(value *HeadEntryValue) (serializedMetadataEntryValu
 ////////////////////////////////////////////////////////////////////////////////
 // Head entry deserialization
 ////////////////////////////////////////////////////////////////////////////////
+
+// Deserialize a head entry value
 func DeserializeHeadEntryValue(valueBytes []byte) *HeadEntryValue {
 	return &HeadEntryValue{
 		Version:                       int64(binary.LittleEndian.Uint64(valueBytes[0:8])),
@@ -69,11 +82,15 @@ func DeserializeHeadEntryValue(valueBytes []byte) *HeadEntryValue {
 ////////////////////////////////////////////////////////////////////////////////
 // Datastore creation
 ////////////////////////////////////////////////////////////////////////////////
+
+// Create a stream for a new datastore, given a reader stream for the content and a creation
+// timestamp
 func CreateNewDatastoreReader(newDatastoreContentReader io.Reader, creationTimestamp int64) io.Reader {
 	serializedHeadEntry := CreateSerializedHeadEntry(&HeadEntryValue{Version: DatastoreVersion}, creationTimestamp)
 	return io.MultiReader(bytes.NewReader(serializedHeadEntry), newDatastoreContentReader)
 }
 
+// Create a reader for a new datastore, given a slice of bytes as content and a timestamp
 func CreateNewDatastoreReaderFromBytes(newDatastoreContentBytes []byte, creationTimestamp int64) io.Reader {
 	return CreateNewDatastoreReader(bytes.NewReader(newDatastoreContentBytes), creationTimestamp)
 }

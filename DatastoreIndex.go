@@ -109,7 +109,7 @@ func (this *DatastoreIndex) LatestTimestamp() int64 {
 	return this.Entries[len(this.Entries)-1].timestamp
 }
 
-// Construct a datastore index
+// Construct a datastore index with no validator
 func NewDatastoreIndex() *DatastoreIndex {
 	return &DatastoreIndex{
 		TotalSize: 0,

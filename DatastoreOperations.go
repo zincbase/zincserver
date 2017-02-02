@@ -49,7 +49,7 @@ type DatastoreOperationsEntry struct {
 	// This is currently used only to cache configuration datastores
 	dataCache *VarMap
 
-	// The associated configuration datastore opreations object. For the configuration datastores
+	// The associated configuration datastore operations object. For the configuration datastores
 	// themselves, this would always be nil.
 	configDatastore *DatastoreOperationsEntry
 
@@ -120,15 +120,16 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 	err = this.index.AddFromEntryStream(NewPrefetchingReaderAt(this.file), 0, fileSize)
 
 	if err != nil {
-		// Check if file ends unexpectedly, or last entry does not include a transaction end marker
+		// If file ended unexpectedly, was corrupted or last entry didn't include a transaction end marker
 		if err == io.ErrUnexpectedEOF || err == ErrCorruptedEntry {
+			// Log message
 			this.parentServer.Log(fmt.Sprintf("An incomplete or corrupted transcacion found in datastore '%s'. Attempting roll-back..", this.name), 1)
 
 			// Attempt to roll back to last succesful transaction, this would also attempt to
 			// reload the index if the repair operation has succeeded
 			err = this.TryRollingBackToLastSuccessfulTransaction()
 
-			// If an error occurred when rolling back
+			// If an error occurred while rolling back
 			if err != nil {
 				// Release
 				this.Release()
@@ -140,7 +141,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 			// Get file size again
 			fileSize, err = this.GetFileSize()
 
-			// If an error occurred when getting the file size
+			// If an error occurred while getting the file size
 			if err != nil {
 				// Release
 				this.Release()
@@ -162,7 +163,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 	if err != nil {
 		// Log a message
 		if err == io.ErrUnexpectedEOF || err == ErrInvalidHeadEntry || err == ErrCorruptedEntry {
-			this.parentServer.Log(fmt.Sprintf("Datastore '%s' cannot be opened as it has an invalid or corrupted head entry", this.name), 1)
+			this.parentServer.Log(fmt.Sprintf("Datastore '%s' cannot be opened as it has an invalid, missing or corrupted head entry", this.name), 1)
 		} else {
 			this.parentServer.Log(fmt.Sprintf("Datastore '%s' cannot be opened due to an unexpected error while trying to load its head entry: %s", this.name, err), 1)
 		}
@@ -316,7 +317,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 		return
 	}
 
-	// If compaction was not needed, schedule a flush, if needed.
+	// If compaction was not performed, schedule a flush, if needed.
 	if !compacted {
 		this.ScheduleFlushIfNeeded()
 	}
@@ -696,7 +697,7 @@ func (this *DatastoreOperationsEntry) Destroy() (err error) {
 /// Repair operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Tries rolling back the datastore to the latest successful transaction.
+// Tries rolling back the datastore to the last successful transaction.
 func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction() (err error) {
 	// Get the size of the datastore file
 	fileSize, err := this.GetFileSize()
@@ -763,7 +764,7 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 	// Log a message
 	this.parentServer.Log(fmt.Sprintf("Truncated datastore '%s' from %d to %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, fileSize, newSize, backupFilePath), 1)
 
-	// Check if the datastore file is empty
+	// Check if the datastore file is now empty
 	if newSize == 0 {
 		// Log message
 		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has been truncated to a 0 length. Adding head entry..", this.name), 1)
@@ -799,7 +800,7 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 /// Head entry operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Cache the value and creation time of the entry, always located on range [0:512] of the file
+// Cache the value and creation time of the head entry, always located on range [0:512] of the file
 func (this *DatastoreOperationsEntry) loadHeadEntry() error {
 	// Create a new iterator for the datastore
 	iterate := NewEntryStreamIterator(this.file, 0, HeadEntrySize)
@@ -813,7 +814,9 @@ func (this *DatastoreOperationsEntry) loadHeadEntry() error {
 		return err
 	}
 
+	// If no entries were found (most likely the file is empty)
 	if iterationResult == nil {
+		// Return a invalid head entry error
 		return ErrInvalidHeadEntry
 	}
 

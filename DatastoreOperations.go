@@ -764,9 +764,9 @@ func (this *DatastoreOperationsEntry) TryRollingBackToLastSuccessfulTransaction(
 	this.parentServer.Log(fmt.Sprintf("Truncated datastore '%s' from %d to %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, fileSize, newSize, backupFilePath), 1)
 
 	// Check if the datastore file is empty
-	if fileSize == 0 {
+	if newSize == 0 {
 		// Log message
-		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has length 0. Adding head entry..", this.name), 1)
+		this.parentServer.Log(fmt.Sprintf("Datastore file '%s' has been truncated to a 0 length. Adding head entry..", this.name), 1)
 
 		// Add a new head entry to the file
 		_, err = io.Copy(this.file, CreateNewDatastoreReaderFromBytes([]byte{}, MonoUnixTimeMicro()))

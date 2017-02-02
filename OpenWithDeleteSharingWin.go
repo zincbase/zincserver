@@ -3,9 +3,9 @@
 package main
 
 import (
-	"unsafe"
-	"syscall"
 	"os"
+	"syscall"
+	"unsafe"
 )
 
 func openWithDeleteSharing(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
@@ -32,14 +32,14 @@ func openWithDeleteSharing(path string, mode int, perm uint32) (fd syscall.Handl
 		access &^= syscall.GENERIC_WRITE
 		access |= syscall.FILE_APPEND_DATA
 	}
-	
+
 	//sharemode := uint32(syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE)
 	sharemode := uint32(syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE)
 
 	var sa *syscall.SecurityAttributes
 	if mode&syscall.O_CLOEXEC == 0 {
 		sa = &syscall.SecurityAttributes{
-			Length: uint32(unsafe.Sizeof(sa)),
+			Length:        uint32(unsafe.Sizeof(sa)),
 			InheritHandle: 1,
 		}
 
@@ -80,7 +80,7 @@ func OpenFileWithDeleteSharing(name string, flag int, perm os.FileMode) (*os.Fil
 
 	if name == "" {
 		return nil, &os.PathError{Op: "open", Path: name, Err: syscall.ENOENT}
-	}	
+	}
 
 	r, errf := openWithDeleteSharing(name, flag|syscall.O_CLOEXEC, syscallMode(perm))
 	if errf != nil {

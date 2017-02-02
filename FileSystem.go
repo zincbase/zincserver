@@ -1,10 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"errors"
 )
 
 func ReplaceFileSafely(filePath string, newContentReader io.Reader) (err error) {

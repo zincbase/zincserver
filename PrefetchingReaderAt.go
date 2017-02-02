@@ -45,8 +45,8 @@ func (this *PrefetchingReaderAt) ReadAt(p []byte, readOffset int64) (int, error)
 		copy(p, this.prefetchBuffer[0:bytesRead])
 		return bytesRead, nil
 
-	// Otherwise just return the result of ReadAt
-	} else {
+		
+	} else { // Otherwise just return the result of ReadAt
 		return this.readerAt.ReadAt(p, readOffset)
 	}
 }

@@ -1,9 +1,10 @@
 package main
 
 import (
+	"bytes"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"bytes"
 )
 
 var _ = Describe("SliceUtilities", func() {

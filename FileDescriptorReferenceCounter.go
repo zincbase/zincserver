@@ -1,10 +1,10 @@
 package main
 
 import (
+	"errors"
+	_ "log"
 	"os"
 	"sync"
-	_ "log"
-	"errors"
 )
 
 type FileDescriptorCounterMap struct {
@@ -25,7 +25,7 @@ func (this *FileDescriptorCounterMap) OpenAndIncrement(name string, flag int, pe
 	if err == nil {
 		this.counterMap[file.Fd()] = 1
 	}
-	
+
 	//log.Printf("OpenAndIncrement %d", file.Fd())
 	this.Unlock()
 	return

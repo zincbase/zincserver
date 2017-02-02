@@ -44,7 +44,7 @@ func CreateHeadEntry(value *HeadEntryValue, timestamp int64) *Entry {
 
 	// Return an entry with the timestamp and serialized value
 	return &Entry{
-		PrimaryHeader:        &EntryPrimaryHeader{ UpdateTime: timestamp, CommitTime: timestamp, Flags: Flag_TransactionEnd},
+		PrimaryHeader:        &EntryPrimaryHeader{UpdateTime: timestamp, CommitTime: timestamp, Flags: Flag_TransactionEnd},
 		SecondaryHeaderBytes: []byte{},
 		Key:                  []byte{},
 		Value:                SerializeHeadEntryValue(value),
@@ -58,7 +58,7 @@ func SerializeHeadEntryValue(value *HeadEntryValue) (serializedMetadataEntryValu
 	binary.LittleEndian.PutUint64(serializedMetadataEntryValue[0:8], uint64(value.Version))
 	binary.LittleEndian.PutUint64(serializedMetadataEntryValue[8:16], uint64(value.LastCompactionTime))
 	binary.LittleEndian.PutUint64(serializedMetadataEntryValue[16:24], uint64(value.LastCompactionCheckTime))
-	binary.LittleEndian.PutUint64(serializedMetadataEntryValue[24:32], uint64(value.LastCompactionCheckSize))	
+	binary.LittleEndian.PutUint64(serializedMetadataEntryValue[24:32], uint64(value.LastCompactionCheckSize))
 	binary.LittleEndian.PutUint64(serializedMetadataEntryValue[32:40], uint64(value.LastCompactionCheckUnusedSize))
 
 	return

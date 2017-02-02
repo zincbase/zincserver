@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"io"
 	"net"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/gorilla/websocket"
 )
 
 type ServerDatastoreHandler struct {

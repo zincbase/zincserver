@@ -10,16 +10,16 @@ import (
 var _ = Describe("DatastoreHeadEntry", func() {
 	It("Creates a serialized head entry", func() {
 		serializedHeadEntry := CreateSerializedHeadEntry(&HeadEntryValue{
-			Version: 1234,
-			LastCompactionTime: 111111,
-			LastCompactionCheckTime: 222222,
-			LastCompactionCheckSize: 333333,
+			Version:                       1234,
+			LastCompactionTime:            111111,
+			LastCompactionCheckTime:       222222,
+			LastCompactionCheckSize:       333333,
 			LastCompactionCheckUnusedSize: 444444,
 		}, 654321)
 
 		Expect(len(serializedHeadEntry)).To(Equal(HeadEntrySize))
 
-		iterate := NewEntryStreamIterator(bytes.NewReader(serializedHeadEntry),0, HeadEntrySize)
+		iterate := NewEntryStreamIterator(bytes.NewReader(serializedHeadEntry), 0, HeadEntrySize)
 		iteratorResult, err := iterate()
 
 		Expect(err).To(BeNil())

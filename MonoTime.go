@@ -26,7 +26,7 @@ func init() {
 
 	MonoUnixTimeNano = func() int64 {
 		return monoUnixTimestampBase + monotime()
-	}	
+	}
 }
 
 // Monotonic unix time, in integer nanoseconds

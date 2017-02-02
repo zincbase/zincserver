@@ -3,9 +3,10 @@ package main
 import (
 	"bytes"
 
+	"math/rand"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"math/rand"
 	//"log"
 )
 
@@ -81,16 +82,16 @@ var _ = Describe("PrefetchingReaderAt", func() {
 		Expect(buf).To(Equal(randomBytes[20000 : 20000+10000]))
 	})
 
-	It("Reads random slices of random lengths from a long (> 32768 characters) slice of bytes", func() {	
+	It("Reads random slices of random lengths from a long (> 32768 characters) slice of bytes", func() {
 		randomBytes := RandomBytes(100000)
-		reader := NewPrefetchingReaderAt(bytes.NewReader(randomBytes))		
+		reader := NewPrefetchingReaderAt(bytes.NewReader(randomBytes))
 
 		random := rand.New(rand.NewSource(0))
 
 		for i := 0; i < 100; i++ {
 			readOffset := random.Intn(100000)
 			readLength := random.Intn(100000 - readOffset)
-			
+
 			//log.Printf("Read offset: %d, Read length: %d", readOffset, readLength)
 
 			buf := make([]byte, readLength)
@@ -98,7 +99,7 @@ var _ = Describe("PrefetchingReaderAt", func() {
 
 			Expect(err).To(BeNil())
 			Expect(n).To(Equal(readLength))
-			Expect(buf).To(Equal(randomBytes[readOffset : readOffset+readLength]))			
+			Expect(buf).To(Equal(randomBytes[readOffset : readOffset+readLength]))
 		}
 	})
 })

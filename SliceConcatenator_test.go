@@ -11,15 +11,15 @@ var _ = Describe("SliceConcatenator", func() {
 
 		Expect(concatenator.Concat()).To(Equal([]byte{}))
 		Expect(concatenator.TotalLength).To(EqualNumber(0))
-		
+
 		concatenator.Append([]byte{1, 2, 3, 4})
 		Expect(concatenator.TotalLength).To(EqualNumber(4))
 		Expect(concatenator.Concat()).To(Equal([]byte{1, 2, 3, 4}))
-		
+
 		concatenator.Append([]byte{5, 6, 7})
 		Expect(concatenator.TotalLength).To(EqualNumber(7))
 		Expect(concatenator.Concat()).To(Equal([]byte{1, 2, 3, 4, 5, 6, 7}))
-		
+
 		concatenator.Append([]byte{8, 9})
 		Expect(concatenator.TotalLength).To(EqualNumber(9))
 		Expect(concatenator.Concat()).To(Equal([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9}))

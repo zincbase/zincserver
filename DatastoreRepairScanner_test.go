@@ -2,9 +2,10 @@ package main
 
 import (
 	"bytes"
+	"math/rand"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"math/rand"
 )
 
 var _ = Describe("EntryStreamRepairer", func() {
@@ -63,7 +64,7 @@ var _ = Describe("EntryStreamRepairer", func() {
 
 	It("Returns a truncated size for an incomplete datastore stream, for a datastore that was compacted before", func() {
 		testEntries := []*Entry{
-			CreateHeadEntry(&HeadEntryValue{ LastCompactionTime: 6 }, 1234),
+			CreateHeadEntry(&HeadEntryValue{LastCompactionTime: 6}, 1234),
 			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Secondary header 2"), []byte("Key2"), []byte("Value2")},
 			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Secondary header 3"), []byte("Key1"), []byte("Value3")},
@@ -112,7 +113,7 @@ var _ = Describe("EntryStreamRepairer", func() {
 		testTruncationSize(cumulativeLengths[5], cumulativeLengths[3])
 		testTruncationSize(cumulativeLengths[6]-1, cumulativeLengths[3])
 		testTruncationSize(cumulativeLengths[6], cumulativeLengths[6])
-	})	
+	})
 
 	It("Returns a correct truncated size for a randomly corrupted entry stream", func() {
 		testEntries := []*Entry{

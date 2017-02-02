@@ -26,7 +26,7 @@ func (this *ServerStaticHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	http.ServeFile(w, r, submatches[1])	
+	http.ServeFile(w, r, submatches[1])
 }
 
 func NewServerStaticHandler(parentServer *Server) *ServerStaticHandler {

@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"encoding/binary"
-	"bytes"
 )
 
 var _ = Describe("EntrySerializer", func() {
@@ -54,5 +55,5 @@ var _ = Describe("EntrySerializer", func() {
 
 		Expect(VerifyPrimaryHeaderChecksum(serializedEntry)).To(BeTrue())
 		Expect(VerifyPayloadChecksum(serializedEntry, bytes.NewReader(serializedEntry[40:]))).To(BeTrue())
-	})	
+	})
 })

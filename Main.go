@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"syscall"
 	"path"
+	"syscall"
 )
 
 const versionString = "0.2.0"
@@ -120,11 +120,11 @@ func parseGenerateCommand(args []string) {
 	commandFlagSet.IntVar(&entryCount, "entryCount", entryCount, "Number of entries to generate.")
 	commandFlagSet.IntVar(&keySize, "keySize", keySize, "Key size.")
 	commandFlagSet.IntVar(&valueSize, "valueSize", valueSize, "Value size.")
-	commandFlagSet.StringVar(&entryType, "entryType", entryType, `Entry type. Can be either one of "randomPathEntry", "randomPathEntryWithBinaryValue", "randomUTF8Entry", "randomBinaryEntry", "randomAlphanumericEntry" or "randomJSONEntry".`)	
+	commandFlagSet.StringVar(&entryType, "entryType", entryType, `Entry type. Can be either one of "randomPathEntry", "randomPathEntryWithBinaryValue", "randomUTF8Entry", "randomBinaryEntry", "randomAlphanumericEntry" or "randomJSONEntry".`)
 	commandFlagSet.BoolVar(&showHelp, "help", showHelp, "Show this help message.")
 	commandFlagSet.Parse(args)
 
-	if (showHelp) {
+	if showHelp {
 		commandFlagSet.PrintDefaults()
 	} else if path == "" {
 		fmt.Println("")

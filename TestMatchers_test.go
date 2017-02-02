@@ -5,6 +5,7 @@ import (
 	//. "github.com/onsi/gomega/gstruct"
 	. "github.com/onsi/gomega/types"
 )
+
 func ExpectEntriesToBeEqual(entry1 Entry, entry2 Entry) {
 	Expect(entry1.PrimaryHeader).To(Equal(entry2.PrimaryHeader))
 	Expect(entry1.SecondaryHeaderBytes).To(Equal(entry2.SecondaryHeaderBytes))
@@ -27,10 +28,10 @@ func ExpectEntriesToBeEquivalent(entry1 Entry, entry2 Entry) {
 	header2 := entry2.PrimaryHeader
 
 	Expect(header1.TotalSize).To(Equal(header2.TotalSize))
-	Expect(header1.KeySize).To(Equal(header2.KeySize))	
-	Expect(header1.KeyFormat).To(Equal(header2.KeyFormat))	
-	Expect(header1.ValueFormat).To(Equal(header2.ValueFormat))	
-	Expect(header1.EncryptionMethod).To(Equal(header2.EncryptionMethod))	
+	Expect(header1.KeySize).To(Equal(header2.KeySize))
+	Expect(header1.KeyFormat).To(Equal(header2.KeyFormat))
+	Expect(header1.ValueFormat).To(Equal(header2.ValueFormat))
+	Expect(header1.EncryptionMethod).To(Equal(header2.EncryptionMethod))
 
 	Expect(entry1.SecondaryHeaderBytes).To(Equal(entry2.SecondaryHeaderBytes))
 	Expect(entry1.Key).To(Equal(entry2.Key))

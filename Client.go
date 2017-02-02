@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
-	"fmt"
 	//"log"
 	"strings"
 )
 
 type Client struct {
-	hostURL string
+	hostURL       string
 	datastoreName string
-	accessKey string
+	accessKey     string
 }
 
 func (this *Client) Get(updatedAfter int64) (entries []Entry, err error) {
@@ -37,7 +37,7 @@ func (this *Client) Post(entries []Entry) (commitTimestamp int64, err error) {
 	}
 
 	responseObject := PutPostResponse{}
-	
+
 	err = json.Unmarshal(responseBody, &responseObject)
 	if err != nil {
 		return
@@ -71,15 +71,15 @@ func (this *Client) Delete() (err error) {
 
 func (this *Client) Request(method string, queryArgs map[string]string, requestBody io.Reader) (response *http.Response, responseBody []byte, err error) {
 	queryComponents := []string{}
-	
+
 	for k, v := range queryArgs {
 		if v != "" {
-			queryComponents = append(queryComponents, fmt.Sprintf("%s=%s", k, v));
+			queryComponents = append(queryComponents, fmt.Sprintf("%s=%s", k, v))
 		}
 	}
 
 	if this.accessKey != "" {
-		queryComponents = append(queryComponents, fmt.Sprintf("accessKey=%s", this.accessKey));
+		queryComponents = append(queryComponents, fmt.Sprintf("accessKey=%s", this.accessKey))
 	}
 
 	url := this.hostURL + "/datastore/" + this.datastoreName + "?" + strings.Join(queryComponents, "&")

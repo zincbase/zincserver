@@ -115,7 +115,7 @@ var _ = Describe("VarMap", func() {
 
 		varMap := NewEmptyVarMap()
 
-		varMap.AppendJsonEntries(nonJsonEntries);
+		varMap.AppendJsonEntries(nonJsonEntries)
 
 		Expect(varMap.Count()).To(Equal(1))
 		Expect(varMap.Has("Key2")).To(BeTrue())
@@ -245,14 +245,14 @@ var _ = Describe("VarMap", func() {
 		result4, err := varMap.GetFirstMatchInt64("Hello", "Ba", "Da", "Tello", "Yo", "Zolo")
 		Expect(err).To(BeNil())
 		Expect(result4).To(Equal(int64(6543)))
-		
+
 		result5, err := varMap.GetFirstMatchBool("Hello", "Ba", "Da", "Tello", "Yo", "Zolo")
 		Expect(err).To(BeNil())
 		Expect(result5).To(Equal(true))
 	})
 
 	It("Can be initialized from a regular Map", func() {
-		someMap := map[string]interface{} {
+		someMap := map[string]interface{}{
 			"a": 1234.12,
 			"b": "Hello",
 			"c": true,
@@ -279,6 +279,6 @@ var _ = Describe("VarMap", func() {
 
 		result5, err := varMap.GetAny("d")
 		Expect(err).To(BeNil())
-		Expect(result5).To(BeNil())		
+		Expect(result5).To(BeNil())
 	})
 })

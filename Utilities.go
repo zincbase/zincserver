@@ -99,7 +99,7 @@ func CRC32COfReader(reader io.Reader) (crc uint32, err error) {
 	if err != nil {
 		return
 	}
-	
+
 	crc = crc32c.Sum32()
 
 	return

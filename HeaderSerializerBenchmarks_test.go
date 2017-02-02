@@ -85,5 +85,5 @@ func Benchmark_HeaderSerializer(bench *testing.B) {
 		for i := 0; i < bench.N; i++ {
 			_ = DeserializePrimaryHeader_Slow(serializedHeader)
 		}
-	})	
+	})
 }

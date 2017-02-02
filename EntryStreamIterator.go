@@ -194,9 +194,9 @@ func (this *EntryStreamIteratorResult) IsHeadEntry() bool {
 
 // Verify as valid head entry
 func (this *EntryStreamIteratorResult) VerifyValidHeadEntry() bool {
-	return  this.Size == HeadEntrySize && 
-			this.KeySize() == 0 &&
-			this.ValueSize() == HeadEntryValueSize
+	return this.Size == HeadEntrySize &&
+		this.KeySize() == 0 &&
+		this.ValueSize() == HeadEntryValueSize
 }
 
 // Get update time

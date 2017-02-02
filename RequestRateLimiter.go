@@ -19,7 +19,7 @@ func (this *RequestRateLimiter) ProcessRequest(userID string, operation string, 
 	this.Lock()
 	defer this.Unlock()
 
-	entryKey := userID + " " + operation 
+	entryKey := userID + " " + operation
 	currentTime := MonoUnixTimeMilli()
 
 	entry, found := this.entries[entryKey]

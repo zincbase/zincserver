@@ -74,10 +74,10 @@ func FindSafeTruncationSize(source io.ReaderAt, endOffset int64) (int64, error) 
 		}
 
 		// If the current entry either has a transaction end flag,
-		// or happened before or at the time datastore was last compacted,
-		// set the truncation size to its end offset
+		// or happened before or at the time datastore was last compacted
 		if iteratorResult.HasTransactionEndFlag() ||
 			iteratorResult.CommitTime() <= headEntryValue.LastCompactionTime {
+			// set the truncation size to its end offset
 			truncationSize = iteratorResult.EndOffset()
 		}
 	}

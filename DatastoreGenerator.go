@@ -65,12 +65,14 @@ func getRandomUtf8Entry(keySize int, valueSize int) (result *Entry) {
 }
 
 func getRandomBinaryEntry(keySize int, valueSize int) (result *Entry) {
+	timestamp := MonoUnixTimeMicro()
+
 	result = &Entry{
 		Key:   RandomBytes(keySize),
 		Value: RandomBytes(valueSize),
 		PrimaryHeader: &EntryPrimaryHeader{
-			UpdateTime:  MonoUnixTimeMicro(),
-			CommitTime:  MonoUnixTimeMicro(),
+			UpdateTime:  timestamp,
+			CommitTime:  timestamp,
 			KeyFormat:   DataFormat_Binary,
 			ValueFormat: DataFormat_Binary,
 			Flags:       Flag_TransactionEnd,
@@ -81,12 +83,14 @@ func getRandomBinaryEntry(keySize int, valueSize int) (result *Entry) {
 }
 
 func getRandomAlphanumericEntry(keySize int, valueSize int) (result *Entry) {
+	timestamp := MonoUnixTimeMicro()
+
 	result = &Entry{
 		Key:   []byte(RandomWordString(keySize)),
 		Value: []byte(RandomWordString(valueSize)),
 		PrimaryHeader: &EntryPrimaryHeader{
-			UpdateTime:  MonoUnixTimeMicro(),
-			CommitTime:  MonoUnixTimeMicro(),
+			UpdateTime:  timestamp,
+			CommitTime:  timestamp,
 			KeyFormat:   DataFormat_UTF8,
 			ValueFormat: DataFormat_UTF8,
 			Flags:       Flag_TransactionEnd,
@@ -97,12 +101,14 @@ func getRandomAlphanumericEntry(keySize int, valueSize int) (result *Entry) {
 }
 
 func getRandomJsonEntry(keySize int, valueSize int) (result *Entry) {
+	timestamp := MonoUnixTimeMicro()
+
 	result = &Entry{
 		Key:   []byte(`"` + RandomWordString(keySize-2) + `"`),
 		Value: []byte(`"` + RandomWordString(valueSize-2) + `"`),
 		PrimaryHeader: &EntryPrimaryHeader{
-			UpdateTime:  MonoUnixTimeMicro(),
-			CommitTime:  MonoUnixTimeMicro(),
+			UpdateTime:  timestamp,
+			CommitTime:  timestamp,
 			KeyFormat:   DataFormat_JSON,
 			ValueFormat: DataFormat_JSON,
 			Flags:       Flag_TransactionEnd,
@@ -113,12 +119,14 @@ func getRandomJsonEntry(keySize int, valueSize int) (result *Entry) {
 }
 
 func getRandomPathEntry(keySize int, valueSize int) (result *Entry) {
+	timestamp := MonoUnixTimeMicro()
+
 	result = &Entry{
 		Key:   []byte(`"['` + RandomWordString(keySize-6) + `']"`),
 		Value: []byte(`"` + RandomWordString(valueSize-2) + `"`),
 		PrimaryHeader: &EntryPrimaryHeader{
-			UpdateTime:  MonoUnixTimeMicro(),
-			CommitTime:  MonoUnixTimeMicro(),
+			UpdateTime:  timestamp,
+			CommitTime:  timestamp,
 			KeyFormat:   DataFormat_JSON,
 			ValueFormat: DataFormat_JSON,
 			Flags:       Flag_TransactionEnd,
@@ -129,12 +137,14 @@ func getRandomPathEntry(keySize int, valueSize int) (result *Entry) {
 }
 
 func getRandomPathEntryWithBinaryValue(keySize int, valueSize int) (result *Entry) {
+	timestamp := MonoUnixTimeMicro()
+
 	result = &Entry{
 		Key:   []byte(`"['` + RandomWordString(keySize-6) + `']"`),
 		Value: RandomBytes(valueSize),
 		PrimaryHeader: &EntryPrimaryHeader{
-			UpdateTime:  MonoUnixTimeMicro(),
-			CommitTime:  MonoUnixTimeMicro(),
+			UpdateTime:  timestamp,
+			CommitTime:  timestamp,
 			KeyFormat:   DataFormat_JSON,
 			ValueFormat: DataFormat_Binary,
 			Flags:       Flag_TransactionEnd,

@@ -53,7 +53,7 @@ var _ = Describe("EntrySerializer", func() {
 		Expect(binary.LittleEndian.Uint32(serializedEntry[32:36])).To(BeNumerically(">", 0))
 		Expect(binary.LittleEndian.Uint32(serializedEntry[36:40])).To(BeNumerically(">", 0))
 
-		Expect(VerifyPrimaryHeaderChecksum(serializedEntry)).To(BeTrue())
-		Expect(VerifyPayloadChecksum(serializedEntry, bytes.NewReader(serializedEntry[40:]))).To(BeTrue())
+		Expect(VerifyPrimaryHeaderChecksum(serializedEntry)).To(BeNil())
+		Expect(VerifyPayloadChecksum(serializedEntry, bytes.NewReader(serializedEntry[40:]))).To(BeNil())
 	})
 })

@@ -130,10 +130,6 @@ func NewDatastoreIndexWithValidator(validator DatastoreIndexEntryValidator) *Dat
 // Construct a datastore index with full checksum verification (i.e. both header and payload)
 func NewDatastoreIndexWithFullChecksumVerification() *DatastoreIndex {
 	return NewDatastoreIndexWithValidator(func(result *EntryStreamIteratorResult) error {
-		if !result.VerifyAllChecksums() {
-			return ErrCorruptedEntry
-		}
-
-		return nil
+		return result.VerifyAllChecksums()
 	})
 }

@@ -11,31 +11,52 @@ func FindSafeTruncationSize(source io.ReaderAt, endOffset int64) (int64, error) 
 	// Iterate once to the first entry
 	iteratorResult, err := next()
 
-	// If an error occurred iterating the first entry or it is empty
-	if err != nil || iteratorResult == nil {
-		// Return a truncation size of 0
+	// If the stream ended unecpectedly
+	if err == io.ErrUnexpectedEOF {
+		// Return a truncation size of 0 with no error
 		return 0, nil
+	} else if err != nil { // Othewise, if some other error occurred
+		// Return the error with a truncation size of the end offset
+		return endOffset, err
 	}
 
-	// Verify it is a valid head entry
-	if !iteratorResult.VerifyValidHeadEntry() {
+	// If the first entry is empty
+	if iteratorResult == nil {
 		// Return a truncation size of 0
 		return 0, nil
 	}
 
 	// Verify the head entry's checksums
-	if !iteratorResult.VerifyAllChecksums() {
+	err = iteratorResult.VerifyAllChecksums()
+
+	// If the checksum verification failed
+	if err == ErrCorruptedEntry {
 		// Return a truncation size of 0
 		return 0, nil
+	} else if err != nil { // If some other error occurred
+		// Return the error and the end offset as truncation size
+		return endOffset, err
+	}
+
+	// If the first entry isn't a valid head entry
+	// (Note that since the checksum verification passed this failing would be a very strange situation)
+	err = iteratorResult.VerifyValidHeadEntry()
+
+	if err == ErrInvalidHeadEntry {
+		// Return a truncation size of 0
+		return 0, nil
+	} else if err != nil { // If some other error occurred
+		// Return the error and the end offset as truncation size
+		return endOffset, err
 	}
 
 	// Read the head entry's value
 	headEntryValueBytes, err := iteratorResult.ReadValue()
 
-	// If an error occurred while reading the value
+	// If reading the value failed
 	if err != nil {
-		// Return a truncation size of 0
-		return 0, nil
+		// Return the error and the end offset as truncation size
+		return endOffset, err
 	}
 
 	// Deserialize the head entry's value
@@ -55,9 +76,10 @@ func FindSafeTruncationSize(source io.ReaderAt, endOffset int64) (int64, error) 
 			if err == io.ErrUnexpectedEOF {
 				// Return the current truncation size
 				return truncationSize, nil
-			} else {
-				// Otherwise, return the error with a zero truncation size
-				return 0, err
+			} else { // If some other error occurred
+				// Return the error with the original end offset as truncation size
+				// (there is no way to know what caused the error, it could be a disk or OS error)
+				return endOffset, err
 			}
 		}
 
@@ -67,17 +89,24 @@ func FindSafeTruncationSize(source io.ReaderAt, endOffset int64) (int64, error) 
 			return truncationSize, nil
 		}
 
-		// If the checksum of the entry fails
-		if !iteratorResult.VerifyAllChecksums() {
+		// Verify the checksums for the entry
+		err = iteratorResult.VerifyAllChecksums()
+
+		// If the checksums failed
+		if err == ErrCorruptedEntry {
 			// Return the current truncation size
 			return truncationSize, nil
+		} else if err != nil { // If some other error occurred
+			// Return the error with the original end offset as truncation size
+			// (there is no way to know what caused the error, it could be a disk or OS error)
+			return endOffset, err
 		}
 
 		// If the current entry either has a transaction end flag,
 		// or happened before or at the time datastore was last compacted
 		if iteratorResult.HasTransactionEndFlag() ||
 			iteratorResult.CommitTime() <= headEntryValue.LastCompactionTime {
-			// set the truncation size to its end offset
+			// Set the truncation size to its end offset
 			truncationSize = iteratorResult.EndOffset()
 		}
 	}

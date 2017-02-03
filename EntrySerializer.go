@@ -199,7 +199,11 @@ func DeserializeEntryStreamReaderAndAppendToVarMap(source io.ReaderAt, startOffs
 ////////////////////////////////////////////////////////////////////////////////
 // Validation
 ////////////////////////////////////////////////////////////////////////////////
-func VerifyPrimaryHeaderChecksum(serializedHeader []byte) bool {
+func VerifyPrimaryHeaderChecksum(serializedHeader []byte) error {
+	if len(serializedHeader) < PrimaryHeaderSize {
+		return io.ErrUnexpectedEOF
+	}
+
 	// Deserialize the expected checksum from the header's bytes
 	expectedChecksum := binary.LittleEndian.Uint32(serializedHeader[32:36])
 
@@ -207,21 +211,31 @@ func VerifyPrimaryHeaderChecksum(serializedHeader []byte) bool {
 	actualChecksum := CRC32C(serializedHeader[0:32])
 
 	// Return their comparison result
-	return actualChecksum == expectedChecksum
+	if actualChecksum != expectedChecksum {
+		return ErrCorruptedEntry
+	}
+
+	return nil
 }
 
-func VerifyPayloadChecksum(serializedHeader []byte, payloadReader io.Reader) bool {
+func VerifyPayloadChecksum(serializedHeader []byte, payloadReader io.Reader) error {
 	// Deserialize the expected checksum from the header's bytes
 	expectedChecksum := binary.LittleEndian.Uint32(serializedHeader[36:40])
 
 	// Calculate the actual checksum
 	actualChecksum, err := CRC32COfReader(payloadReader)
 
+	// If an error occurred when calculating the CRC32 of the payload
 	if err != nil {
-		return false
+		// Return the error
+		return err
 	}
 
-	return actualChecksum == expectedChecksum
+	if actualChecksum != expectedChecksum {
+		return ErrCorruptedEntry
+	}
+
+	return nil
 }
 
 func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64) error {

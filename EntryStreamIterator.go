@@ -173,18 +173,30 @@ func (this *EntryStreamIteratorResult) HasTransactionEndFlag() bool {
 }
 
 // Verify the primary header's checksum
-func (this *EntryStreamIteratorResult) VerifyPrimaryHeaderChecksum() bool {
+func (this *EntryStreamIteratorResult) VerifyPrimaryHeaderChecksum() error {
 	return VerifyPrimaryHeaderChecksum(this.PrimaryHeaderBytes)
 }
 
 // Verify the payload's checksum
-func (this *EntryStreamIteratorResult) VerifyPayloadChecksum() bool {
+func (this *EntryStreamIteratorResult) VerifyPayloadChecksum() error {
 	return VerifyPayloadChecksum(this.PrimaryHeaderBytes, this.CreatePayloadReader())
 }
 
 // Verify all checksums
-func (this *EntryStreamIteratorResult) VerifyAllChecksums() bool {
-	return this.VerifyPrimaryHeaderChecksum() && this.VerifyPayloadChecksum()
+func (this *EntryStreamIteratorResult) VerifyAllChecksums() (err error) {
+	// Verify primary header checksum
+	err = this.VerifyPrimaryHeaderChecksum()
+	if err != nil {
+		return err
+	}
+
+	// Verify payload checksum
+	err = this.VerifyPayloadChecksum()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Is this supposed to be a head entry?
@@ -193,10 +205,15 @@ func (this *EntryStreamIteratorResult) IsHeadEntry() bool {
 }
 
 // Verify as valid head entry
-func (this *EntryStreamIteratorResult) VerifyValidHeadEntry() bool {
-	return this.Size == HeadEntrySize &&
-		this.KeySize() == 0 &&
-		this.ValueSize() == HeadEntryValueSize
+func (this *EntryStreamIteratorResult) VerifyValidHeadEntry() error {
+
+	if this.Size != HeadEntrySize ||
+		this.KeySize() != 0 ||
+		this.ValueSize() != HeadEntryValueSize {
+			return ErrInvalidHeadEntry
+	}
+
+	return nil
 }
 
 // Get update time

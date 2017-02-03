@@ -736,7 +736,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 	}
 
 	// If the truncated datastore size is equal to the current size of the datastore
-	if repairedSize == originalSize {
+	if repairedSize > 0 && repairedSize == originalSize {
 		// No need to repair anything
 		this.parentServer.Log(fmt.Sprintf("No need to repair datastore '%s'.", this.name), 1)
 		return
@@ -804,7 +804,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 		this.parentServer.Log(fmt.Sprintf("Failed to recreate index for datastore '%s' after repair.", this.name), 1)
 	} else { // Otherwise
 		// Log a message
-		this.parentServer.Log(fmt.Sprintf("Repaired datastore '%s'. Original size %d, Repaired size %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, originalSize, repairedSize, backupFilePath), 1)
+		this.parentServer.Log(fmt.Sprintf("Repaired datastore '%s'. Original size %d bytes, Repaired size %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, originalSize, repairedSize, backupFilePath), 1)
 	}
 
 	return
@@ -835,15 +835,21 @@ func (this *DatastoreOperationsEntry) loadHeadEntry() error {
 	}
 
 	// If the first entry is corrupt
-	if !iterationResult.VerifyAllChecksums() {
-		// Return a corrupted entry error
-		return ErrCorruptedEntry
+	err = iterationResult.VerifyAllChecksums()
+
+	// If the verification failed
+	if err != nil {
+		// Return the error
+		return err
 	}
 
-	// If the first entry isn't a head entry
-	if !iterationResult.VerifyValidHeadEntry() {
-		// Return an invalid head entry error
-		return ErrInvalidHeadEntry
+	// Verify the first entry is a valid head entry
+	err = iterationResult.VerifyValidHeadEntry()
+
+	// If the verification failed
+	if err != nil {
+		// Return the error
+		return err
 	}
 
 	// Read the value of the head entry

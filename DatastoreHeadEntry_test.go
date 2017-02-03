@@ -23,7 +23,7 @@ var _ = Describe("DatastoreHeadEntry", func() {
 		iteratorResult, err := iterate()
 
 		Expect(err).To(BeNil())
-		Expect(iteratorResult.VerifyAllChecksums()).To(BeTrue())
+		Expect(iteratorResult.VerifyAllChecksums()).To(BeNil())
 		Expect(iteratorResult.Size).To(EqualNumber(HeadEntrySize))
 		Expect(iteratorResult.KeySize()).To(EqualNumber(0))
 		Expect(iteratorResult.ValueSize()).To(EqualNumber(HeadEntryValueSize))

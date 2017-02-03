@@ -2,7 +2,7 @@
 
 ## Overview
 
-The 'raw' or binary entry stream is the internal format used natively in datastore files, raw server responses and WebSocket message payloads. The format is designed to allow future evolution while still maintaining a baseline level of common functionality to ensure both backwards and forwards compatibility.  
+The 'raw' or binary entry stream is the internal format used natively in datastore files, raw server responses and WebSocket message payloads. The format is designed to allow future evolution while still maintaining a baseline level of common functionality to ensure both backwards and forwards compatibility.
 
 It is structured in the following way:
 ```
@@ -56,7 +56,7 @@ The `AES-128-GCM` Encryption format is planned but has not been finalized yet.
 
 The encrypted key is not semantically secure - multiple encryptions of the same key would result in the same ciphertext. However, this property is essential to allow for operations like key lookup and compaction to be possible at the server side.
 
-**Important note**: 
+**Important note**:
 
 End-to-end encryption is meant to _complement_ an existing layer of security at the transport layer, such as a TLS socket paired with a high quality certificate. Having keys and values encrypted by clients before transmission provides some additional level of _privacy_ to clients and _encryption at rest_ for servers. However, it doesn't provide a strong level of _tamper resistance_. It should not be, by any means, considered secure on its own.
 
@@ -69,9 +69,9 @@ The currently used flags are:
 
 ## Checksums
 
-* Header checksum: a 32 bit CRC32C (I.e. Castaganoli) checksum for all the primary header bytes in the range [0:32]. Note this doesn't include the checksum itself.
+* Header checksum: a 32 bit CRC32C (I.e. Castagnoli) checksum for all the primary header bytes in the range [0:32]. Note this doesn't include the checksum itself.
 
-* Payload checksum: a 32 bit CRC32C (I.e. Castaganoli) checksum for all the rest of the bytes in the entry. Starting at byte 40. Note this doesn't include the checksum itself.
+* Payload checksum: a 32 bit CRC32C (I.e. Castagnoli) checksum for all the rest of the bytes in the entry. Starting at byte 40. Note this doesn't include the checksum itself.
 
 ## Secondary header
 

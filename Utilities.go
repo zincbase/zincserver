@@ -10,10 +10,10 @@ import (
 	"time"
 )
 
-var CastaganoliCRC32Table *crc32.Table
+var CastagnoliCRC32Table *crc32.Table
 
 func init() {
-	CastaganoliCRC32Table = crc32.MakeTable(crc32.Castagnoli)
+	CastagnoliCRC32Table = crc32.MakeTable(crc32.Castagnoli)
 }
 
 func MinInt(a, b int) int {
@@ -89,11 +89,11 @@ func SHA1(data []byte) string {
 }
 
 func CRC32C(data []byte) uint32 {
-	return crc32.Checksum(data, CastaganoliCRC32Table)
+	return crc32.Checksum(data, CastagnoliCRC32Table)
 }
 
 func CRC32COfReader(reader io.Reader) (crc uint32, err error) {
-	crc32c := crc32.New(CastaganoliCRC32Table)
+	crc32c := crc32.New(CastagnoliCRC32Table)
 	_, err = io.Copy(crc32c, reader)
 
 	if err != nil {

@@ -817,10 +817,10 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 // Cache the value and creation time of the head entry, always located on range [0:512] of the file
 func (this *DatastoreOperationsEntry) loadHeadEntry() error {
 	// Create a new iterator for the datastore
-	iterate := NewEntryStreamIterator(this.file, 0, HeadEntrySize)
+	next := NewEntryStreamIterator(this.file, 0, HeadEntrySize)
 
 	// Iterate once
-	iterationResult, err := iterate()
+	iterationResult, err := next()
 
 	// If an error occurred while iterating or the iterator has completed
 	if err != nil {

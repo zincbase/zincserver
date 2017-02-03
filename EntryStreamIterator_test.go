@@ -25,10 +25,10 @@ var _ = Describe("EntryStreamIterator", func() {
 
 		entryStream := ConcatSliceList(serializedEntries)
 
-		moveNext := NewEntryStreamIterator(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
+		next := NewEntryStreamIterator(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
 
 		for i, entry := range testEntries {
-			iteratorResult, err := moveNext()
+			iteratorResult, err := next()
 			Expect(err).To(BeNil())
 
 			Expect(iteratorResult.KeySize()).To(EqualNumber(len(entry.Key)))

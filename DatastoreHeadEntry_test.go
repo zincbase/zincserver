@@ -19,8 +19,8 @@ var _ = Describe("DatastoreHeadEntry", func() {
 
 		Expect(len(serializedHeadEntry)).To(Equal(HeadEntrySize))
 
-		iterate := NewEntryStreamIterator(bytes.NewReader(serializedHeadEntry), 0, HeadEntrySize)
-		iteratorResult, err := iterate()
+		next := NewEntryStreamIterator(bytes.NewReader(serializedHeadEntry), 0, HeadEntrySize)
+		iteratorResult, err := next()
 
 		Expect(err).To(BeNil())
 		Expect(iteratorResult.VerifyAllChecksums()).To(BeNil())

@@ -11,9 +11,11 @@ import (
 )
 
 var CastagnoliCRC32Table *crc32.Table
+var globalRand *rand.Rand
 
 func init() {
 	CastagnoliCRC32Table = crc32.MakeTable(crc32.Castagnoli)
+	globalRand = rand.New(rand.NewSource(int64(time.Now().UnixNano())))
 }
 
 func MinInt(a, b int) int {
@@ -45,20 +47,17 @@ func MaxFloat64(a, b float64) float64 {
 }
 
 func RandomBytes(length int) (result []byte) {
-	random := rand.New(rand.NewSource(MonoUnixTimeNano()))
 	result = make([]byte, length)
-	random.Read(result)
+	globalRand.Read(result)
 	return result
 }
 
 func RandomWordString(length int) string {
-
 	letters := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	resultBytes := []byte{}
 
-	random := rand.New(rand.NewSource(MonoUnixTimeNano()))
 	for i := 0; i < length; i++ {
-		resultBytes = append(resultBytes, letters[random.Intn(len(letters))])
+		resultBytes = append(resultBytes, letters[globalRand.Intn(len(letters))])
 	}
 
 	return string(resultBytes)
@@ -71,9 +70,8 @@ func RandomUtf8String(length int, maxCodePoint int) string {
 
 	resultBuffer := bytes.Buffer{}
 
-	random := rand.New(rand.NewSource(MonoUnixTimeNano()))
 	for i := 0; i < length; i++ {
-		resultBuffer.WriteRune(rune(random.Intn(maxCodePoint)))
+		resultBuffer.WriteRune(rune(globalRand.Intn(maxCodePoint)))
 	}
 
 	return resultBuffer.String()

@@ -51,12 +51,14 @@ func GenerateRandomEntryStreamBytes(entryCount int, keySize int, valueSize int, 
 }
 
 func getRandomUtf8Entry(keySize int, valueSize int) (result *Entry) {
+	timestamp := MonoUnixTimeMicro()
+
 	return &Entry{
 		Key:   []byte(RandomUtf8String(keySize, -1)),
 		Value: []byte(RandomUtf8String(valueSize, -1)),
 		PrimaryHeader: &EntryPrimaryHeader{
-			UpdateTime:  MonoUnixTimeMicro(),
-			CommitTime:  MonoUnixTimeMicro(),
+			UpdateTime:  timestamp,
+			CommitTime:  timestamp,
 			KeyFormat:   DataFormat_UTF8,
 			ValueFormat: DataFormat_UTF8,
 			Flags:       Flag_TransactionEnd,

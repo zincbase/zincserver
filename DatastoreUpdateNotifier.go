@@ -26,7 +26,7 @@ func NewDatastoreUpdateNotifier() *DatastoreUpdateNotifier {
 // Note this assumes that updates before or at the given timestamp have already been handled
 func (this *DatastoreUpdateNotifier) CreateUpdateNotificationChannel(minTimestampThreshold int64) (resultChannel chan int64) {
 	// Create a channel
-	resultChannel = make(chan int64)
+	resultChannel = make(chan int64, 1)
 
 	// Lock this object
 	this.Lock()

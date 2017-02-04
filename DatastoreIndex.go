@@ -22,7 +22,7 @@ type DatastoreIndex struct {
 }
 
 // Append the index from a stream of serialized entries
-func (this *DatastoreIndex) AddFromEntryStream(source io.ReaderAt, startOffset int64, endOffset int64) error {
+func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffset int64, endOffset int64) error {
 	// Create an entry stream iterator
 	next := NewEntryStreamIterator(source, startOffset, endOffset)
 
@@ -64,7 +64,7 @@ func (this *DatastoreIndex) AddFromEntryStream(source io.ReaderAt, startOffset i
 		}
 
 		// If the current entry has a commit time that's strictly greater than previous one
-		if iteratorResult.PrimaryHeader.CommitTime > previousCommitTimestamp {
+		if iteratorResult.CommitTime() > previousCommitTimestamp {
 			// Add the offset and commit time of that entry to the index
 			this.Entries = append(
 				this.Entries,
@@ -72,7 +72,7 @@ func (this *DatastoreIndex) AddFromEntryStream(source io.ReaderAt, startOffset i
 		}
 
 		// Update the previous commit time variable
-		previousCommitTimestamp = iteratorResult.PrimaryHeader.CommitTime
+		previousCommitTimestamp = iteratorResult.CommitTime()
 
 		// Add the size of the new entry to the total size of the indexed entries
 		this.TotalSize += iteratorResult.Size
@@ -82,7 +82,7 @@ func (this *DatastoreIndex) AddFromEntryStream(source io.ReaderAt, startOffset i
 // Append the index from a buffer containing an empty stream
 func (this *DatastoreIndex) AppendFromBuffer(entryStreamBuffer []byte) error {
 	// Create a reader for the buffer and add from it
-	return this.AddFromEntryStream(bytes.NewReader(entryStreamBuffer), 0, int64(len(entryStreamBuffer)))
+	return this.AppendFromEntryStream(bytes.NewReader(entryStreamBuffer), 0, int64(len(entryStreamBuffer)))
 }
 
 // Find the offset for the first entry that was updated after the given time

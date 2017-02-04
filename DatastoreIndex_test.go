@@ -28,7 +28,7 @@ var _ = Describe("DatastoreIndex", func() {
 
 		testData := ConcatSliceList(serializedEntries)
 
-		err := index.AddFromEntryStream(bytes.NewReader(testData), 0, int64(len(testData)))
+		err := index.AppendFromEntryStream(bytes.NewReader(testData), 0, int64(len(testData)))
 		Expect(err).To(BeNil())
 
 		Expect(int(index.TotalSize)).To(Equal(len(testData)))
@@ -61,7 +61,7 @@ var _ = Describe("DatastoreIndex", func() {
 
 		entryStream := ConcatSliceList(serializedEntries)
 
-		err := index.AddFromEntryStream(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
+		err := index.AppendFromEntryStream(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
 
 		Expect(err).To(BeNil())
 
@@ -96,7 +96,7 @@ var _ = Describe("DatastoreIndex", func() {
 		}
 
 		for i, _ := range serializedEntries {
-			err := index.AddFromEntryStream(bytes.NewReader(serializedEntries[i]), 0, int64(len(serializedEntries[i])))
+			err := index.AppendFromEntryStream(bytes.NewReader(serializedEntries[i]), 0, int64(len(serializedEntries[i])))
 			Expect(err).To(BeNil())
 			Expect(index.LatestTimestamp()).To(Equal(testEntries[i].PrimaryHeader.CommitTime))
 		}

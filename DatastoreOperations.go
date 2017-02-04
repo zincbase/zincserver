@@ -128,7 +128,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 
 	// Create index
 	this.index = NewDatastoreIndexWithFullChecksumVerification()
-	err = this.index.AddFromEntryStream(NewPrefetchingReaderAt(this.file), 0, fileSize)
+	err = this.index.AppendFromEntryStream(NewPrefetchingReaderAt(this.file), 0, fileSize)
 
 	// If an error occurred when creating the index or the file was empty
 	if err != nil || fileSize == 0 {
@@ -796,7 +796,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 
 	// Try recreating the index up to the repaired size
 	this.index = NewDatastoreIndexWithFullChecksumVerification()
-	err = this.index.AddFromEntryStream(this.file, 0, repairedSize)
+	err = this.index.AppendFromEntryStream(this.file, 0, repairedSize)
 
 	// If an error occurred when recreating the index
 	if err != nil {

@@ -210,8 +210,9 @@ func VerifyPrimaryHeaderChecksum(serializedHeader []byte) error {
 	// Calculate the actual checksum
 	actualChecksum := CRC32C(serializedHeader[0:32])
 
-	// Return their comparison result
+	// If the actual checksum doesn't match the expected one
 	if actualChecksum != expectedChecksum {
+		// Return a corrupted entry error
 		return ErrCorruptedEntry
 	}
 
@@ -231,7 +232,9 @@ func VerifyPayloadChecksum(serializedHeader []byte, payloadReader io.Reader) err
 		return err
 	}
 
+	// If the actual checksum doesn't match the expected one
 	if actualChecksum != expectedChecksum {
+		// Return a corrupted entry error
 		return ErrCorruptedEntry
 	}
 
@@ -239,31 +242,43 @@ func VerifyPayloadChecksum(serializedHeader []byte, payloadReader io.Reader) err
 }
 
 func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64) error {
+	// Initialize the minimal allowed timestamp to 01/01/2017
 	const minAllowedTimestamp int64 = 1483221600 * 1000000
+	// Set the maximal allowed timestamp to current time + 30 seconds
 	maxAllowedTimestamp := MonoUnixTimeMicro() + (30 * 1000000)
 
+	// Create an iterator to the given entry stream
 	next := NewEntryStreamIterator(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
 
+	// Repeat
 	for {
+		// Iterate to next result
 		iteratorResult, err := next()
 
+		// If an error occurred when iterating
 		if err != nil {
+			// Return the error
 			return err
 		}
 
+		// If the iterator result is empty
 		if iteratorResult == nil {
+			// Return without error
 			return nil
 		}
 
-		if iteratorResult.PrimaryHeader.KeySize == 0 {
+		// Ensure the key size isn't zero
+		if iteratorResult.KeySize() == 0 {
 			return errors.New("Encountered an entry with a zero length key, which is not permitted in transaction entries.")
 		}
 
+		// Ensure the primary header doesn't contain any other flag than 'TransactionEnd'
 		if iteratorResult.PrimaryHeader.Flags > 1 {
 			return errors.New("Encountered an entry header containing a flag that is not 'TransactionEnd' (1).")
 		}
 
-		if iteratorResult.PrimaryHeader.UpdateTime < minAllowedTimestamp {
+		// Ensure the entry's timestamp isn't less than than the minimum allowed timestamp
+		if iteratorResult.UpdateTime() < minAllowedTimestamp {
 			return errors.New("Encountered an entry header containing an update time smaller than 1483221600 * 1000000 (Januaray 1st 2017, 00:00).")
 		}
 
@@ -271,18 +286,21 @@ func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64)
 			return errors.New("Encountered an entry header containing an update time greater than 30 seconds past the server's clock.")
 		}
 
+		// Ensure the entry's timestamp isn't greater than than the maximum allowed timestamp
 		if newCommitTimestamp > 0 {
 			iteratorResult.PrimaryHeader.CommitTime = newCommitTimestamp
 		}
 
-		if iteratorResult.Offset+iteratorResult.Size == int64(len(entryStream)) {
+		// If the entry is the last one
+		if iteratorResult.EndOffset() == int64(len(entryStream)) {
+			// Add a transaction end flag to it
 			iteratorResult.PrimaryHeader.Flags |= Flag_TransactionEnd
 		}
 
-		// Update the header bytes
+		// Update the serialized entry with the modified header
 		SerializePrimaryHeader(entryStream[iteratorResult.Offset:], iteratorResult.PrimaryHeader)
 
-		// Add checksums for the header and payload
+		// Add checksums for both the header and payload
 		AddChecksumsToSerializedEntry(entryStream[iteratorResult.Offset:iteratorResult.EndOffset()])
 	}
 }

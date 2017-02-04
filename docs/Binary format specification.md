@@ -27,7 +27,7 @@ Where the primary header, totaling 320 bits (40 bytes), is of the form:
 <Payload checksum (32-bit unsigned integer)>
 ```
 
-(All values are little-endian, except checksums, which are big-endian, in accordance with the based on the common format for CRC-32)
+(All values are little-endian)
 
 ## Key/Value encoding format
 

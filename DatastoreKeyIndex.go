@@ -87,7 +87,7 @@ func (this *DatastoreKeyIndex) GetCompactedRanges(readOffset int64, consolidate 
 
 	// If consolidate option was enabled
 	if consolidate {
-		// Create a list of consolidate ranges
+		// Create a list of consolidated ranges
 		consolidatedRanges := RangeList{}
 
 		// For each range in the compacted ranges

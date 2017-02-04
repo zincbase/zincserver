@@ -218,10 +218,10 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 				// set the error to 'nil', and continue
 				err = nil
 			default: // Otherwise
-				// Rrelease
+				// Release
 				this.Release()
 
-				// Rreturn the error
+				// Return the error
 				return
 			}
 		}
@@ -402,7 +402,7 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 	}
 
 	// Safely replace file the datastore file with a creation entry and the new transaction as content
-	err = ReplaceFileSafely(this.filePath, CreateNewDatastoreReaderFromBytes(transactionBytes, commitTimestamp))
+	err = CreateOrRewriteFileSafe(this.filePath, CreateNewDatastoreReaderFromBytes(transactionBytes, commitTimestamp))
 
 	// If an error occured when replacing the file
 	if err != nil {
@@ -617,7 +617,7 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 		keyIndex.CreateReaderForCompactedRanges(this.file, HeadEntrySize))
 
 	// Rewrite the file with the compacted ranges
-	err = ReplaceFileSafely(this.filePath, compactedDatastoreReader)
+	err = CreateOrRewriteFileSafe(this.filePath, compactedDatastoreReader)
 
 	// If an error occurred while rewriting the file
 	if err != nil {
@@ -693,7 +693,7 @@ func (this *DatastoreOperationsEntry) Destroy() (err error) {
 	}
 
 	// Delete the datastore file
-	err = DeleteFileSafely(this.filePath)
+	err = UnlinkFileSafe(this.filePath)
 
 	// If an error occurred during the operation
 	if err != nil {
@@ -744,7 +744,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 
 	// Create a backup copy of the corrupted datastore
 	backupFilePath := fmt.Sprintf("%s.corrupted-%d", this.filePath, MonoUnixTimeMicro())
-	err = ReplaceFileSafely(backupFilePath, this.file)
+	err = CreateOrRewriteFileSafe(backupFilePath, this.file)
 
 	// If an error occurred when creating a backup file
 	if err != nil {

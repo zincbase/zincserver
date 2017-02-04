@@ -11,7 +11,7 @@ func GenerateRandomDatastore(filePath string, entryCount int, keySize int, value
 	entryStreamBuffer := GenerateRandomEntryStreamBytes(entryCount, keySize, valueSize, entryType)
 	ValidateAndPrepareTransaction(entryStreamBuffer, -1)
 
-	err = ReplaceFileSafely(filePath, CreateNewDatastoreReaderFromBytes(entryStreamBuffer, creationTimestamp))
+	err = CreateOrRewriteFileSafe(filePath, CreateNewDatastoreReaderFromBytes(entryStreamBuffer, creationTimestamp))
 	if err != nil {
 		log.Printf("Failed storing '%s'\n", filePath)
 		return

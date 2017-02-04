@@ -2,61 +2,9 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 )
-
-func ReplaceFileSafely(filePath string, newContentReader io.Reader) (err error) {
-	// Write new content to a temporary file
-	tempFileName := fmt.Sprintf("%s.temp-%d", filePath, MonoUnixTimeMicro())
-	RewriteFile(tempFileName, newContentReader, true)
-
-	// Add the '.old' suffix to the existing file, if exists.
-	oldFileName := fmt.Sprintf("%s.old-%d", filePath, MonoUnixTimeMicro())
-	fileExists, err := FileExists(filePath)
-	if err != nil {
-		return
-	}
-
-	if fileExists {
-		err = os.Rename(filePath, oldFileName)
-		if err != nil {
-			return
-		}
-	}
-
-	// Rename the temporary file to the target file
-	err = os.Rename(tempFileName, filePath)
-	if err != nil {
-		return
-	}
-
-	// Delete the old file, if existed
-	if fileExists {
-		err = os.Remove(oldFileName)
-		if err != nil {
-			return
-		}
-	}
-
-	return
-}
-
-func DeleteFileSafely(filePath string) (err error) {
-	deletedFileName := fmt.Sprintf("%s.deleted-%d", filePath, MonoUnixTimeMicro())
-	err = os.Rename(filePath, deletedFileName)
-	if err != nil {
-		return
-	}
-
-	err = os.Remove(deletedFileName)
-	if err != nil {
-		return
-	}
-
-	return
-}
 
 func FileExists(filePath string) (bool, error) {
 	_, err := os.Stat(filePath)
@@ -90,22 +38,36 @@ func DirectoryExists(directoryPath string) (bool, error) {
 	}
 }
 
-func RewriteFile(filePath string, newContentReader io.Reader, syncAfterWrite bool) (err error) {
+func CreateOrRewriteFile(filePath string, newContentReader io.Reader, flushAfterWrite bool) (err error) {
+	// Open the file with creation and truncate modes and delete sharing
 	file, err := OpenFileWithDeleteSharing(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+
+	// If an error occurred while opening the file
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// Close the file once the function exists
 	defer file.Close()
 
+	// Write the data from the reader to the file
 	_, err = io.Copy(file, newContentReader)
+
+	// If an error occurred while writing
 	if err != nil {
+		// Return the error
 		return
 	}
 
-	if syncAfterWrite {
+	// If a flush was requested
+	if flushAfterWrite {
+		// Flush the file
 		err = file.Sync()
+
+		// If an error occurred while flushing the file
 		if err != nil {
+			// Return the error
 			return
 		}
 	}
@@ -114,19 +76,31 @@ func RewriteFile(filePath string, newContentReader io.Reader, syncAfterWrite boo
 }
 
 func ReadEntireFile(filePath string) (fileContent []byte, err error) {
+	// Open the file for reading only, with delete sharing enabled
 	file, err := OpenFileWithDeleteSharing(filePath, os.O_RDONLY, 0666)
+
+	// If an error occurred while opening the file
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// Close the file once the function exists
 	defer file.Close()
 
+	// Create a new memory writer
 	memoryWriter := NewMemoryWriter()
+
+	// Read the entire file to memory
 	_, err = io.Copy(memoryWriter, file)
+
+	// If an error occurred while reading the file
 	if err != nil {
+		// Return the error
 		return
 	}
 
+	// Set the returned slice to the data read
 	fileContent = memoryWriter.WrittenData()
 
 	return

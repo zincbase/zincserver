@@ -42,9 +42,8 @@ func openWithDeleteSharing(path string, mode int, perm uint32) (fd syscall.Handl
 			Length:        uint32(unsafe.Sizeof(sa)),
 			InheritHandle: 1,
 		}
-
-		//sa = makeInheritSa()
 	}
+	
 	var createmode uint32
 	switch {
 	case mode&(syscall.O_CREAT|syscall.O_EXCL) == (syscall.O_CREAT | syscall.O_EXCL):

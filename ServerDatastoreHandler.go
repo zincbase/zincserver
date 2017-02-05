@@ -162,7 +162,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 			requestLimitCount, _ := operations.GetInt64ConfigValue(profileForMethodPrefix + "['limit']['requests']['count']")
 
 			// Use the rate limiter object to decide if the allowed request rate has been exceeded
-			allowed := operations.rateLimiter.ProcessRequest(clientID, method, requestLimitInterval, requestLimitCount)
+			allowed := operations.rateLimiter.ProcessEvent(clientID, method, requestLimitInterval, requestLimitCount)
 
 			// If the rate has been exceeded, end with an error
 			if !allowed {

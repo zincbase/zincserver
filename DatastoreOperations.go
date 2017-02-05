@@ -34,7 +34,7 @@ type DatastoreOperationsEntry struct {
 
 	// An object tracking the rate and type of operations performed by each client, allowing to set
 	// limits for this datastore
-	rateLimiter *RequestRateLimiter
+	rateLimiter *RateLimiter
 
 	// A flag that signifies if flush operation is currently scheduled
 	flushScheduled bool
@@ -84,7 +84,7 @@ func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *Da
 		configDatastore:     nil,
 
 		dataCache:   nil,
-		rateLimiter: NewRequestRateLimiter(),
+		rateLimiter: NewRateLimiter(),
 	}
 }
 

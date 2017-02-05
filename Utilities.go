@@ -77,8 +77,8 @@ func RandomUtf8String(length int, maxCodePoint int) string {
 	return resultBuffer.String()
 }
 
-func Sleep(duration int64) {
-	time.Sleep(time.Duration(duration) * time.Millisecond)
+func Sleep(durationMilliseconds float64) {
+	time.Sleep(time.Duration(int64(durationMilliseconds * float64(time.Millisecond))))
 }
 
 func SHA1(data []byte) string {

@@ -4,6 +4,8 @@ import (
 	"io"
 )
 
+// Given an input datastore stream, find the longest truncation length such that the datastore would
+// be a valid one
 func FindSafeTruncationSize(source io.ReaderAt, endOffset int64) (int64, error) {
 	// Create a new iterator
 	next := NewEntryStreamIterator(source, 0, endOffset)

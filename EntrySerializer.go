@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
-	//"strconv"
 	"encoding/binary"
 	"io"
 )
@@ -269,24 +267,25 @@ func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64)
 
 		// Ensure the key size isn't zero
 		if iteratorResult.KeySize() == 0 {
-			return errors.New("Encountered an entry with a zero length key, which is not permitted in transaction entries.")
+			return ErrEntryRejected{"Encountered an entry with a zero length key, which is not permitted in transaction entries."}
 		}
 
 		// Ensure the primary header doesn't contain any other flag than 'TransactionEnd'
 		if iteratorResult.PrimaryHeader.Flags > 1 {
-			return errors.New("Encountered an entry header containing a flag that is not 'TransactionEnd' (1).")
+			return ErrEntryRejected{"Encountered an entry header containing a flag that is not 'TransactionEnd' (1)."}
 		}
 
 		// Ensure the entry's timestamp isn't less than than the minimum allowed timestamp
 		if iteratorResult.UpdateTime() < minAllowedTimestamp {
-			return errors.New("Encountered an entry header containing an update time smaller than 1483221600 * 1000000 (Januaray 1st 2017, 00:00).")
-		}
-
-		if iteratorResult.PrimaryHeader.UpdateTime > maxAllowedTimestamp {
-			return errors.New("Encountered an entry header containing an update time greater than 30 seconds past the server's clock.")
+			return ErrEntryRejected{"Encountered an entry header containing an update time lesser than 1483221600 * 1000000 (Januaray 1st 2017, 00:00)."}
 		}
 
 		// Ensure the entry's timestamp isn't greater than than the maximum allowed timestamp
+		if iteratorResult.PrimaryHeader.UpdateTime > maxAllowedTimestamp {
+			return ErrEntryRejected{"Encountered an entry header containing an update time greater than 30 seconds past the server's clock."}
+		}
+
+		// Set the commit timestamp, if needed
 		if newCommitTimestamp > 0 {
 			iteratorResult.PrimaryHeader.CommitTime = newCommitTimestamp
 		}

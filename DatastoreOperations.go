@@ -284,7 +284,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 
 	// Make sure the transaction wouldn't cause it to exceed this limit
 	if datastoreSizeLimit > 0 && this.index.TotalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
-		return 0, ErrDatastoreTooLarge{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
+		return 0, ErrDatastoreSizeLimitExceeded{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
 
 	// Get commit timestamp
@@ -361,7 +361,7 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 
 	// Make sure the transaction wouldn't cause it to exceed this limit
 	if datastoreSizeLimit > 0 && int64(len(transactionBytes)) > datastoreSizeLimit {
-		return 0, ErrDatastoreTooLarge{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
+		return 0, ErrDatastoreSizeLimitExceeded{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
 
 	// Get a safe commit timestamp (must be strictly greater than a previous commit timestamp)

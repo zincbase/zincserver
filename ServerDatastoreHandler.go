@@ -448,11 +448,22 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 
 	// If an error occured when commiting the transaction
 	if err != nil {
-		// Check for datastore too large errors and respond accordingly
-		switch err.(type) {
-		case ErrDatastoreTooLarge:
-			endRequestWithError(w, r, http.StatusForbidden, err)
+		// Handle an unexpected end of stream error
+		if err == io.ErrUnexpectedEOF {
+			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected EOF was encountered while validating the given entry stream"))
 			err = nil
+		} else { // Handle other errors
+			switch err.(type) {
+			// Check for entry rejected errors and respond with a forbidden request status
+			case ErrEntryRejected:
+				endRequestWithError(w, r, http.StatusBadRequest, err)
+				err = nil
+
+			// Check for datastore too large errors and respond with a forbidden request status
+			case ErrDatastoreSizeLimitExceeded:
+				endRequestWithError(w, r, http.StatusForbidden, err)
+				err = nil
+			}
 		}
 
 		// Otherwise, any other error would be considered an internal server error
@@ -484,16 +495,27 @@ func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *h
 	// Unlock the datastore
 	operations.Unlock()
 
-	// If an error occure
+	// If an error occured when commiting the transaction
 	if err != nil {
-		// Check for datastore too large errors and respond accordingly
-		switch err.(type) {
-		case ErrDatastoreTooLarge:
-			endRequestWithError(w, r, http.StatusForbidden, err)
+		// Handle an unexpected end of stream error
+		if err == io.ErrUnexpectedEOF {
+			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected EOF was encountered while validating the given entry stream"))
 			err = nil
+		} else { // Handle other errors
+			switch err.(type) {
+			// Check for entry rejected errors and respond with a forbidden request status
+			case ErrEntryRejected:
+				endRequestWithError(w, r, http.StatusBadRequest, err)
+				err = nil
+
+			// Check for datastore too large errors and respond with a forbidden request status
+			case ErrDatastoreSizeLimitExceeded:
+				endRequestWithError(w, r, http.StatusForbidden, err)
+				err = nil
+			}
 		}
 
-		// Any other error would become an internal server error
+		// Otherwise, any other error would be considered an internal server error
 		return
 	}
 

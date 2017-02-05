@@ -6,11 +6,19 @@ import (
 
 var ErrDatastoreNotOpen = errors.New("Datastore is not open")
 
-type ErrDatastoreTooLarge struct {
+type ErrDatastoreSizeLimitExceeded struct {
 	message string
 }
 
-func (this ErrDatastoreTooLarge) Error() string {
+func (this ErrDatastoreSizeLimitExceeded) Error() string {
+	return this.message
+}
+
+type ErrEntryRejected struct {
+	message string
+}
+
+func (this ErrEntryRejected) Error() string {
 	return this.message
 }
 

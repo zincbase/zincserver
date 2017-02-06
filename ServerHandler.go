@@ -19,6 +19,8 @@ func (this *ServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				this.staticHandler.ServeHTTP(w, r)
 		*/
 	} else {
+		this.parentServer.Log("["+r.RemoteAddr+"]: " + r.Method + " " + r.URL.Path + " <invalid path>", 1)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		http.Error(w, "Invalid request path.", http.StatusBadRequest)
 	}
 }

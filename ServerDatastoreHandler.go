@@ -18,72 +18,51 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Declare the datastore handler object type
 type ServerDatastoreHandler struct {
 	parentServer *Server
 }
 
+// Datastore handler object constructor function
+func NewServerDatastoreHandler(parentServer *Server) *ServerDatastoreHandler {
+	return &ServerDatastoreHandler{
+		parentServer: parentServer,
+	}
+}
+
+// Declare helper regular expression objects
 var datastorePathRegexp *regexp.Regexp
 var accessKeyRegexp *regexp.Regexp
 
 func init() {
+	// Initialize helper regular expression objects
 	datastorePathRegexp = regexp.MustCompile(`^/datastore/([a-zA-Z0-9_]*(\.config)?)$`)
 	accessKeyRegexp = regexp.MustCompile(`^[0-9a-f]*$`)
 }
 
+// The main handler for all datastore requests
 func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Parse URL
+	// Extract the datastore name form the request path
 	submatches := datastorePathRegexp.FindStringSubmatch(r.URL.Path)
 
-	if len(submatches) == 0 {
-		endRequestWithError(w, r, http.StatusBadRequest, errors.New("Invalid datastore request path, should be of the form '/datastore/[name]', where [name] may only contain the characters A-Z, a-z and 0-9."))
+	// If no valid datastore name was found
+	if len(submatches) == 0 || len(submatches[1]) == 0 || len(submatches[1]) > 128 {
+		// Log a message
+		this.parentServer.Log("["+r.RemoteAddr+"]: " + r.Method + " " + r.URL.Path + " <invalid path>", 1)
+
+		// Ensure that cross-origin requests will also be able to receive the error
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// End with an error
+		endRequestWithError(w, r, http.StatusBadRequest, errors.New("Invalid datastore request path, should be of the form '/datastore/[name][.config?]', where [name] may only contain the characters A-Z, a-z and 0-9 and have length between 1 and 128 characters."))
 		return
 	}
 
+	// Get target datastore name from the match results
 	datastoreName := submatches[1]
 
-	// Get operations object for the requested datastores
+	// Get operations object for the target datastore
 	operations := this.parentServer.GetDatastoreOperations(datastoreName)
-
-	// Parse request
-	method := r.Method
-	parsedQuery := r.URL.Query()
-	accessKey := parsedQuery.Get("accessKey")
-
-	var accessKeyHash string
-
-	if len(accessKey) == 0 {
-		accessKeyHash = ""
-	} else {
-		hash := sha1.Sum([]byte(accessKey))
-		accessKeyHash = hex.EncodeToString(hash[0:])
-	}
-
-	// Print a log message if needed
-	logLevel := this.parentServer.startupOptions.LogLevel
-
-	if logLevel > 0 {
-		secureURI := strings.Replace(r.RequestURI, "accessKey="+accessKey, "[accessKeyHash="+accessKeyHash+"]", 1)
-
-		if logLevel >= 2 {
-			message := "\n"
-			message += "[" + r.RemoteAddr + "]: " + r.Method + " " + secureURI + "\n"
-
-			for k, v := range r.Header {
-				message += fmt.Sprintf("%s: %s\n", k, v)
-			}
-
-			this.parentServer.Log(message, 2)
-		} else if logLevel == 1 {
-
-			this.parentServer.Log("["+r.RemoteAddr+"]: "+r.Method+" "+secureURI, 1)
-		}
-	}
-
-	// Check for too long datastore names
-	if len(datastoreName) > 128 {
-		endRequestWithError(w, r, http.StatusBadRequest, errors.New("Datastore name cannot be longer than 128 characters"))
-		return
-	}
 
 	// Send CORS headers and handle the OPTIONS request method if needed
 	origin := r.Header.Get("Origin")
@@ -106,19 +85,59 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// Set cache control headers
-	w.Header().Set("Cache-Control", "max-age=0")
+	// Get request method
+	method := r.Method
 
+	// Normalize the method variable for WebSocket requests
+	if method == "GET" && strings.ToLower(r.Header.Get("Upgrade")) == "websocket" {
+		method = "WebSocket"
+	}
+
+	// Parse the query
+	parsedQuery := r.URL.Query()
+
+	// Get the access key included in the request
+	accessKey := parsedQuery.Get("accessKey")
+
+	// Calculate the hex representation of the access key hash
+	var accessKeyHash string
+
+	if len(accessKey) == 0 {
+		accessKeyHash = ""
+	} else {
+		hash := sha1.Sum([]byte(accessKey))
+		accessKeyHash = hex.EncodeToString(hash[0:])
+	}
+
+	// Print a log message if needed
+	logLevel := this.parentServer.startupOptions.LogLevel
+
+	if logLevel > 0 {
+		secureURI := strings.Replace(r.RequestURI, "accessKey="+accessKey, "[accessKeyHash="+accessKeyHash+"]", 1)
+
+		if logLevel >= 2 {
+			message := "\n"
+			message += "[" + r.RemoteAddr + "]: " + method + " " + secureURI + "\n"
+
+			for k, v := range r.Header {
+				message += fmt.Sprintf("%s: %s\n", k, v)
+			}
+
+			this.parentServer.Log(message, 2)
+		} else if logLevel == 1 {
+			this.parentServer.Log("["+r.RemoteAddr+"]: " + method + " "+secureURI, 1)
+		}
+	}
+
+	// For the rest of this function, a 'HEAD' request is treated the same as 'GET'
+	if method == "HEAD" {
+		method = "GET"
+	}
+
+	// Verify the access key has a valid length and character set
 	if !accessKeyRegexp.MatchString(accessKey) || (len(accessKey) != 0 && len(accessKey) != 32) {
 		endRequestWithError(w, r, http.StatusBadRequest, errors.New("A non-empty access key must contain exactly 32 lowercase hexedecimal digits."))
 		return
-	}
-
-	// Normalize the 'method' variable for WebSocket and HEAD requests
-	if method == "GET" && strings.ToLower(r.Header.Get("Upgrade")) == "websocket" {
-		method = "WebSocket"
-	} else if method == "HEAD" { // For the context of this function, a 'HEAD' request is treated the same as 'GET'
-		method = "GET"
 	}
 
 	// Get master key hash
@@ -191,7 +210,6 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	// Now that all general security checks have passed, dispatch the appropriate handler for
 	// the particular method requested
-
 	switch method {
 	case "GET": // 'HEAD' is also included here as the 'method' variable would be changed to 'GET' in that case
 		err = this.handleGetOrHeadRequest(w, r, datastoreName, operations, parsedQuery)
@@ -216,6 +234,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// Handles a GET or HEAD request
 func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
 	// Parse the "updatedAfter" query parameter (ParseInt returns 0 if string was empty or invalid).
 	updatedAfter, _ := strconv.ParseInt(query.Get("updatedAfter"), 10, 64)
@@ -274,6 +293,7 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 	}
 
 	// Set headers for the response
+	w.Header().Set("Cache-Control", "max-age=0")
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Length", strconv.FormatInt(readSize, 10))
 
@@ -303,6 +323,7 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 	return
 }
 
+// Handles WebSocket upgrade requests
 func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
 	// Parse the "updatedAfter" query parameter (ParseInt returns 0 if string was empty or invalid).
 	updatedAfter, _ := strconv.ParseInt(query.Get("updatedAfter"), 10, 64)
@@ -411,6 +432,7 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 	}
 }
 
+// Handles POST requests
 func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
 	// Read the entire request body to memory
 	serializedEntries, err := ReadEntireStream(r.Body)
@@ -481,6 +503,7 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 	return
 }
 
+// Handles PUT requests
 func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
 	// Read the entire request body to memory
 	serializedEntries, err := ReadEntireStream(r.Body)
@@ -530,6 +553,7 @@ func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *h
 	return
 }
 
+// Handles DELETE requests
 func (this *ServerDatastoreHandler) handleDeleteRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
 	// If the target datastore is the global configuration datastore, reject the request
 	// with a "method not allowed" status
@@ -572,12 +596,5 @@ func endRequestWithError(w http.ResponseWriter, r *http.Request, statusCode int,
 		http.Error(w, err.Error(), statusCode)
 	} else {
 		http.Error(w, "", statusCode)
-	}
-}
-
-// Datastore Handler objec constructor function
-func NewServerDatastoreHandler(parentServer *Server) *ServerDatastoreHandler {
-	return &ServerDatastoreHandler{
-		parentServer: parentServer,
 	}
 }

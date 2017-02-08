@@ -4,7 +4,9 @@ ZincServer is a high-performance server back-end for [ZincDB](https://github.com
 
 ## Status
 
-The software is mostly feature complete, but still at an alpha level of stability. Additional real-world testing is required before it is ready for production use. To help turn this into a mature, stable product, please report any crash, unexpected behavior or missing feature at the [issue tracker](https://github.com/zincbase/zincserver/issues).
+The software is mostly feature complete, but still at an alpha level of stability. Further automated and real-world testing would be required before it is ready for production use. Please report any crash, unexpected behavior, security weakness or missing feature at the [issue tracker](https://github.com/zincbase/zincserver/issues).
+
+Note that the binary storage format used by the engine might still be subject breaking modifications before it is finalized. Any data stored with an alpha version of this software might become unreadable to a future version.
 
 ## Platform support
 

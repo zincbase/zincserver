@@ -38,6 +38,11 @@ func ExpectEntriesToBeEquivalent(entry1 Entry, entry2 Entry) {
 	Expect(entry1.Value).To(Equal(entry2.Value))
 }
 
+func ExpectEntriesToHaveCommitTimestamp(entries []Entry, commitTimestamp int64) {
+	for i := 0; i < len(entries); i++ {
+		Expect(entries[i].PrimaryHeader.CommitTime).To(Equal(commitTimestamp))
+	}
+}
 func ExpectEntryArraysToBeEquivalent(entries1 []Entry, entries2 []Entry) {
 	Expect(entries1).To(HaveLen(len(entries2)))
 

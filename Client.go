@@ -29,14 +29,34 @@ type PutPostResponse struct {
 }
 
 // Sends a GET request to the server with the given 'updatedAfter' minimum timestamp
-func (this *Client) Get(updatedAfter int64) (entries []Entry, err error) {
+func (this *Client) Get(updatedAfter int64) (results []Entry, err error) {
 	_, responseBody, err := this.Request("GET", map[string]string{"updatedAfter": fmt.Sprintf("%d", updatedAfter)}, nil)
 	if err != nil {
 		return
 	}
 
-	entries, err = DeserializeEntryStreamBytes(responseBody)
-	
+	results, err = DeserializeEntryStreamBytes(responseBody)
+
+	return
+}
+
+// Sends a GET request to the server with the given 'updatedAfter' minimum timestamp, and compacts the results
+func (this *Client) GetAndCompact(updatedAfter int64) (results []Entry, err error) {
+	_, responseBody, err := this.Request("GET", map[string]string{"updatedAfter": fmt.Sprintf("%d", updatedAfter)}, nil)
+	if err != nil {
+		return
+	}
+
+	compactedEntryStream, err := CompactEntryStreamBytes(responseBody)
+	if err != nil {
+		return
+	}
+
+	results, err = DeserializeEntryStreamBytes(compactedEntryStream)
+	if err != nil {
+		return
+	}
+
 	return
 }
 
@@ -78,6 +98,17 @@ func (this *Client) Put(entries []Entry) (commitTimestamp int64, err error) {
 	return responseObject.CommitTimestamp, nil
 }
 
+func (this *Client) PostOrPut(entries []Entry) (commitTimestamp int64, err error) {
+	commitTimestamp, err = this.Post(entries)
+
+	if err != nil {
+		commitTimestamp, err = this.Put(entries)
+		return
+	} else {
+		return
+	}
+}
+
 // Sends a DELETE request for this datastore
 func (this *Client) Delete() (err error) {
 	_, _, err = this.Request("DELETE", map[string]string{}, nil)
@@ -101,7 +132,7 @@ func (this *Client) Request(method string, queryArgs map[string]string, requestB
 	queryString := "?" + strings.Join(queryComponents, "&")
 	var url string
 
-	if (len(queryString) > 1) {
+	if len(queryString) > 1 {
 		url = this.hostURL + "/datastore/" + this.datastoreName + queryString
 	} else {
 		url = this.hostURL + "/datastore/" + this.datastoreName

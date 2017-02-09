@@ -6,7 +6,7 @@ type ServerDatastoreHandlerSimulator struct {
 }
 
 // Datastore simulator object constructor
-func NewServerDatastoreHandlerMock() *ServerDatastoreHandlerSimulator {
+func NewServerDatastoreHandlerSimulator() *ServerDatastoreHandlerSimulator {
 	return &ServerDatastoreHandlerSimulator{
 		entries: nil,
 	}
@@ -45,6 +45,23 @@ func (this *ServerDatastoreHandlerSimulator) Get(updatedAfter int64) ([]Entry, e
 	}
 
 	return []Entry{}, nil
+}
+
+// Simulate a GET request and compact the result
+func (this *ServerDatastoreHandlerSimulator) GetAndCompact(updatedAfter int64) (results []Entry, err error) {
+	results, err = this.Get(updatedAfter)
+	if err != nil {
+		return
+	}
+
+	serializedResults := SerializeEntries(results)
+	compactedSerializedResults, err := CompactEntryStreamBytes(serializedResults);
+
+	if err != nil {
+		return
+	}
+
+	return DeserializeEntryStreamBytes(compactedSerializedResults)
 }
 
 // Simulate a DELETE request.

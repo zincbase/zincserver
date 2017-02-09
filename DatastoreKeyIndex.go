@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"sort"
 )
@@ -15,6 +16,11 @@ func NewDatastoreKeyIndex() *DatastoreKeyIndex {
 	return &DatastoreKeyIndex{
 		keyIndex: make(map[string]Range),
 	}
+}
+
+// Add to the key index from the given entry stream
+func (this *DatastoreKeyIndex) AddFromByteArray(entryStream []byte) error {
+	return this.AddFromEntryStream(bytes.NewReader(entryStream), 0, int64(len(entryStream)))
 }
 
 // Add to the key index from the given entry stream
@@ -133,7 +139,7 @@ func (this *DatastoreKeyIndex) CreateReaderForCompactedRanges(entryStream io.Rea
 }
 
 // Compact the given entry stream to a buffer
-func (this *DatastoreKeyIndex) CompactToBuffer(entryStream io.ReaderAt, startOffset int64) (result []byte, err error) {
+func (this *DatastoreKeyIndex) CompactToByteArray(entryStream io.ReaderAt, startOffset int64) (result []byte, err error) {
 	// Create a new memory writer
 	memoryWriter := NewMemoryWriter()
 
@@ -151,4 +157,21 @@ func (this *DatastoreKeyIndex) CompactToBuffer(entryStream io.ReaderAt, startOff
 
 	// Return the result
 	return
+}
+
+func CompactEntryStream(entryStream io.ReaderAt, startOffset int64, endOffset int64) (result []byte, err error) {
+	index := NewDatastoreKeyIndex()
+
+	err = index.AddFromEntryStream(entryStream, startOffset, endOffset)
+	if err != nil {
+		return
+	}
+
+	result, err = index.CompactToByteArray(entryStream, 0)
+
+	return
+}
+
+func CompactEntryStreamBytes(entryStreamBytes []byte) (result []byte, err error) {
+	return CompactEntryStream(bytes.NewReader(entryStreamBytes), 0, int64(len(entryStreamBytes)))
 }

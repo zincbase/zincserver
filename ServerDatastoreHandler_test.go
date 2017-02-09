@@ -1,14 +1,10 @@
 package main
 
 import (
-	//"log"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	//"log"
-	"math/rand"
-	//"log"
 )
 
 var _ = Describe("Server", func() {
@@ -23,13 +19,30 @@ var _ = Describe("Server", func() {
 	}
 
 	getRandomEntries := func() []Entry {
-		return GenerateRandomEntries(1+rand.Intn(9), 1+rand.Intn(9), rand.Intn(100), "randomBinaryEntry")
+		return GenerateRandomEntries(RandomIntInRange(1, 10), RandomIntInRange(1, 100), RandomIntInRange(0, 5000), "randomBinaryEntry")
 	}
 
 	config := DefaultServerStartupOptions()
 	config.InsecurePort = 12345
 	config.StoragePath = "./tests_temp/"
 	config.NoAutoMasterKey = true
+
+	const host = "http://localhost:12345"
+
+	setGlobalServerSetting := func(key string, value string) (err error) {
+		globalConfigClient := NewClient(host, ".config", "")
+
+		_, err = globalConfigClient.Post([]Entry{
+			Entry{
+				PrimaryHeader:        &EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON},
+				SecondaryHeaderBytes: nil,
+				Key:                  []byte(key),
+				Value:                []byte(value),
+			},
+		})
+
+		return
+	}
 
 	var testEntries []Entry
 	var server *Server
@@ -38,7 +51,7 @@ var _ = Describe("Server", func() {
 	BeforeEach(func() {
 		testEntries = getTestEntries()
 		server = NewServer(config)
-		client = NewClient("http://localhost:12345", RandomWordString(10), "")
+		client = NewClient(host, RandomWordString(10), "")
 		server.Start()
 	})
 
@@ -217,6 +230,75 @@ var _ = Describe("Server", func() {
 			err = client.Delete()
 			Expect(err).To(BeNil())
 		}
+	})
+
+	It("Executes a series of random operations and matches their results to a simulated datastore state", func() {
+		settingErr := setGlobalServerSetting(`"['datastore']['compaction']['enabled']"`, "false")
+		Expect(settingErr).To(BeNil())
+
+		mock := NewServerDatastoreHandlerMock()
+
+		for i := 0; i < 1000; i++ {
+			operationCode := RandomIntInRange(0, 100)
+
+			if operationCode < 5 { // PUT operation
+				randomEntries := getRandomEntries()
+
+				commitTimestamp, clientErr := client.Put(randomEntries)
+
+				if clientErr != nil {
+					mockErr := mock.Put(randomEntries)
+					Expect(mockErr).NotTo(BeNil())
+				} else {
+					timestampedEntries, clientErr := client.Get(commitTimestamp - 1)
+					Expect(clientErr).To(BeNil())
+					ExpectEntryArraysToBeEquivalent(timestampedEntries[1:], randomEntries)
+
+					mockErr := mock.Put(timestampedEntries)
+					Expect(mockErr).To(BeNil())
+				}
+			} else if operationCode < 40 { // POST operation
+				randomEntries := mock.GetRandomNewAndMutatedEntries()
+
+				commitTimestamp, clientErr := client.Post(randomEntries)
+
+				if clientErr != nil {
+					mockErr := mock.Post(randomEntries)
+					Expect(mockErr).NotTo(BeNil())
+				} else {
+					timestampedEntries, err := client.Get(commitTimestamp - 1)
+					Expect(err).To(BeNil())
+					ExpectEntryArraysToBeEquivalent(timestampedEntries, randomEntries)
+
+					mockErr := mock.Post(timestampedEntries)
+					Expect(mockErr).To(BeNil())
+				}
+			} else if operationCode < 95 { // GET operation
+				randomTimestamp := mock.GetRandomTimestampInCommittedRange()
+				clientResult, clientErr := client.Get(randomTimestamp)
+				mockResult, mockErr := mock.Get(randomTimestamp)
+
+				if clientErr != nil {
+					Expect(mockErr).NotTo(BeNil())
+				} else {
+					Expect(mockErr).To(BeNil())
+					ExpectEntryArraysToBeEqual(clientResult, mockResult)
+				}
+			} else { // DELETE operation
+				clientErr := client.Delete()
+				mockErr := mock.Delete()
+
+				if clientErr != nil {
+					Expect(mockErr).NotTo(BeNil())
+				} else {
+					Expect(mockErr).To(BeNil())
+				}
+			}
+		}
+
+		// Revert to defualt compaction setting
+		settingErr = setGlobalServerSetting(`"['datastore']['compaction']['enabled']"`, "true")
+		Expect(settingErr).To(BeNil())
 	})
 
 	It("Errors on GET requests to non-existing datastores", func() {

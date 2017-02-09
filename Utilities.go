@@ -63,6 +63,14 @@ func RandomWordString(length int) string {
 	return string(resultBytes)
 }
 
+func RandomIntInRange(min int, max int) int {
+	return min + rand.Intn(max - min)
+}
+
+func RandomInt63InRange(min int64, max int64) int64 {
+	return min + rand.Int63n(max - min)
+}
+
 func RandomUtf8String(length int, maxCodePoint int) string {
 	if maxCodePoint == -1 {
 		maxCodePoint = 1114112

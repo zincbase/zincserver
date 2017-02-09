@@ -11,12 +11,24 @@ import (
 	"strings"
 )
 
+// The client object
 type Client struct {
 	hostURL       string
 	datastoreName string
 	accessKey     string
 }
 
+// The client object constructor
+func NewClient(hostURL string, datastoreName string, accessKey string) *Client {
+	return &Client{hostURL: hostURL, datastoreName: datastoreName, accessKey: accessKey}
+}
+
+// A type for the returned result in PUT and POST requests
+type PutPostResponse struct {
+	CommitTimestamp int64 `json:"commitTimestamp"`
+}
+
+// Sends a GET request to the server with the given 'updatedAfter' minimum timestamp
 func (this *Client) Get(updatedAfter int64) (entries []Entry, err error) {
 	_, responseBody, err := this.Request("GET", map[string]string{"updatedAfter": fmt.Sprintf("%d", updatedAfter)}, nil)
 	if err != nil {
@@ -24,10 +36,11 @@ func (this *Client) Get(updatedAfter int64) (entries []Entry, err error) {
 	}
 
 	entries, err = DeserializeEntryStreamBytes(responseBody)
-
+	
 	return
 }
 
+// Sends a POST request to the server with the given entries as a transaction
 func (this *Client) Post(entries []Entry) (commitTimestamp int64, err error) {
 	serializedEntriesBytes := SerializeEntries(entries)
 	_, responseBody, err := this.Request("POST", map[string]string{}, bytes.NewReader(serializedEntriesBytes))
@@ -46,6 +59,7 @@ func (this *Client) Post(entries []Entry) (commitTimestamp int64, err error) {
 	return responseObject.CommitTimestamp, nil
 }
 
+// Sends a PUT request to the server with the given entries as a transaction
 func (this *Client) Put(entries []Entry) (commitTimestamp int64, err error) {
 	serializedEntriesBytes := SerializeEntries(entries)
 	_, responseBody, err := this.Request("PUT", map[string]string{}, bytes.NewReader(serializedEntriesBytes))
@@ -64,11 +78,13 @@ func (this *Client) Put(entries []Entry) (commitTimestamp int64, err error) {
 	return responseObject.CommitTimestamp, nil
 }
 
+// Sends a DELETE request for this datastore
 func (this *Client) Delete() (err error) {
 	_, _, err = this.Request("DELETE", map[string]string{}, nil)
 	return
 }
 
+// Sends an HTTP request to the datastore with the given method, arguments and body
 func (this *Client) Request(method string, queryArgs map[string]string, requestBody io.Reader) (response *http.Response, responseBody []byte, err error) {
 	queryComponents := []string{}
 
@@ -82,7 +98,14 @@ func (this *Client) Request(method string, queryArgs map[string]string, requestB
 		queryComponents = append(queryComponents, fmt.Sprintf("accessKey=%s", this.accessKey))
 	}
 
-	url := this.hostURL + "/datastore/" + this.datastoreName + "?" + strings.Join(queryComponents, "&")
+	queryString := "?" + strings.Join(queryComponents, "&")
+	var url string
+
+	if (len(queryString) > 1) {
+		url = this.hostURL + "/datastore/" + this.datastoreName + queryString
+	} else {
+		url = this.hostURL + "/datastore/" + this.datastoreName
+	}
 
 	request, err := http.NewRequest(method, url, requestBody)
 
@@ -110,12 +133,4 @@ func (this *Client) Request(method string, queryArgs map[string]string, requestB
 	}
 
 	return
-}
-
-func NewClient(hostURL string, datastoreName string, accessKey string) *Client {
-	return &Client{hostURL: hostURL, datastoreName: datastoreName, accessKey: accessKey}
-}
-
-type PutPostResponse struct {
-	CommitTimestamp int64 `json:"commitTimestamp"`
 }

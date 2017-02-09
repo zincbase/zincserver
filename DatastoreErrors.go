@@ -24,3 +24,4 @@ func (this ErrEntryRejected) Error() string {
 
 var ErrCorruptedEntry = errors.New("Invalid entry checksum detected. This may be due to data corruption.")
 var ErrInvalidHeadEntry = errors.New("Invalid head entry detected.")
+var ErrEmptyTransaction = errors.New("An empty transaction bytestream was given.")

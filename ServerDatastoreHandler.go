@@ -472,7 +472,10 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 	if err != nil {
 		// Handle an unexpected end of stream error
 		if err == io.ErrUnexpectedEOF {
-			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected EOF was encountered while validating the given entry stream"))
+			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected end of stream was encountered while validating the given transaction"))
+			err = nil
+		} else if (err == ErrEmptyTransaction) {
+			endRequestWithError(w, r, http.StatusBadRequest, errors.New("No transaction data was included in the request body"))
 			err = nil
 		} else { // Handle other errors
 			switch err.(type) {

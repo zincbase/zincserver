@@ -300,8 +300,8 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 
 	// If the transaction is empty
 	if len(transactionBytes) == 0 {
-		// Return without error
-		return
+		// Return with an "empty transaction" error
+		return 0, ErrEmptyTransaction
 	}
 
 	// Get the datastore size limit

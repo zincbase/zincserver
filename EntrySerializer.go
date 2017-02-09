@@ -195,6 +195,38 @@ func DeserializeEntryStreamReaderAndAppendToVarMap(source io.ReaderAt, startOffs
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Compaction
+////////////////////////////////////////////////////////////////////////////////
+func CompactEntries(entries []Entry) []Entry {
+	results := []Entry{}
+	seenKeys := make(map[string]bool)
+
+	for i := len(entries) - 1; i >= 0; i-- {
+		keyHash := SHA1ToString(entries[i].Key)
+
+		if seenKeys[keyHash] == true {
+			continue
+		} else {
+			seenKeys[keyHash] = true
+			results = append(results, entries[i])
+		}
+	}
+
+	// Reverse results
+	left := 0;
+	right := len(results) - 1;
+
+	for left < right {
+		results[left], results[right] = results[right], results[left]
+
+		left += 1;
+		right -= 1;
+	}
+
+	return results
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Validation
 ////////////////////////////////////////////////////////////////////////////////
 func VerifyPrimaryHeaderChecksum(serializedHeader []byte) error {

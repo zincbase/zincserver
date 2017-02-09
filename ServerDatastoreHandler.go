@@ -1,9 +1,6 @@
 package main
 
 import (
-	//"bytes"
-	"crypto/sha1"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -48,7 +45,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	// If no valid datastore name was found
 	if len(submatches) == 0 || len(submatches[1]) == 0 || len(submatches[1]) > 128 {
 		// Log a message
-		this.parentServer.Log("["+r.RemoteAddr+"]: " + r.Method + " " + r.URL.Path + " <invalid path>", 1)
+		this.parentServer.Log("["+r.RemoteAddr+"]: "+r.Method+" "+r.URL.Path+" <invalid path>", 1)
 
 		// Ensure that cross-origin requests will also be able to receive the error
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -105,8 +102,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	if len(accessKey) == 0 {
 		accessKeyHash = ""
 	} else {
-		hash := sha1.Sum([]byte(accessKey))
-		accessKeyHash = hex.EncodeToString(hash[0:])
+		accessKeyHash = SHA1ToHex([]byte(accessKey))
 	}
 
 	// Print a log message if needed
@@ -125,7 +121,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 			this.parentServer.Log(message, 2)
 		} else if logLevel == 1 {
-			this.parentServer.Log("["+r.RemoteAddr+"]: " + method + " "+secureURI, 1)
+			this.parentServer.Log("["+r.RemoteAddr+"]: "+method+" "+secureURI, 1)
 		}
 	}
 
@@ -474,7 +470,7 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 		if err == io.ErrUnexpectedEOF {
 			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected end of stream was encountered while validating the given transaction"))
 			err = nil
-		} else if (err == ErrEmptyTransaction) {
+		} else if err == ErrEmptyTransaction {
 			endRequestWithError(w, r, http.StatusBadRequest, errors.New("No transaction data was included in the request body"))
 			err = nil
 		} else { // Handle other errors

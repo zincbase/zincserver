@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"crypto/sha1"
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
@@ -205,8 +204,7 @@ func DefaultServerConfig(masterKey string) []byte {
 	var masterKeyHashHex string
 
 	if len(masterKey) > 0 {
-		masterKeyHash := sha1.Sum([]byte(masterKey))
-		masterKeyHashHex = hex.EncodeToString(masterKeyHash[0:])
+		masterKeyHashHex = SHA1ToHex([]byte(masterKey))
 	} else {
 		masterKeyHashHex = ""
 	}

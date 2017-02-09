@@ -61,12 +61,12 @@ func (this *DatastoreKeyIndex) AddFromEntryStream(entryStream io.ReaderAt, start
 
 // Set a key in the map to the given range
 func (this *DatastoreKeyIndex) Set(key []byte, startOffset int64, endOffset int64) {
-	this.keyIndex[SHA1(key)] = Range{startOffset, endOffset}
+	this.keyIndex[SHA1ToString(key)] = Range{startOffset, endOffset}
 }
 
 // Get the range associated with the given key, if exists
 func (this *DatastoreKeyIndex) Get(key []byte) (result Range, exists bool) {
-	result, exists = this.keyIndex[SHA1(key)]
+	result, exists = this.keyIndex[SHA1ToString(key)]
 	return
 }
 

@@ -56,4 +56,17 @@ var _ = Describe("EntrySerializer", func() {
 		Expect(VerifyPrimaryHeaderChecksum(serializedEntry)).To(BeNil())
 		Expect(VerifyPayloadChecksum(serializedEntry, bytes.NewReader(serializedEntry[40:]))).To(BeNil())
 	})
+
+	It("Compacts a series of entries", func() {
+		entries := []Entry{
+			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key1"), Value: []byte("Value1")},
+			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key2"), Value: []byte("Value2")},
+			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key1"), Value: []byte("Value3")},
+			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key3"), Value: []byte("Value4")},
+			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key3"), Value: []byte("Value5")},
+			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key4"), Value: []byte("Value6")},
+		}
+
+		Expect(CompactEntries(entries)).To(Equal([]Entry{entries[1], entries[2], entries[4], entries[5]}))
+	})
 })

@@ -5,6 +5,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	// "log"
 )
 
 var _ = Describe("Server", func() {
@@ -18,8 +19,8 @@ var _ = Describe("Server", func() {
 		}
 	}
 
-	getRandomEntries := func() []Entry {
-		return GenerateRandomEntries(RandomIntInRange(1, 10), RandomIntInRange(1, 100), RandomIntInRange(0, 5000), "randomBinaryEntry")
+	getRandomEntries := func(maxCount int, maxKeySize int, maxValueSize int) []Entry {
+		return GenerateRandomEntries(RandomIntInRange(1, maxCount), maxKeySize, maxValueSize, "randomBinaryEntry")
 	}
 
 	config := DefaultServerStartupOptions()
@@ -145,7 +146,7 @@ var _ = Describe("Server", func() {
 		Expect(err).To(BeNil())
 
 		for i := 0; i < 20; i++ {
-			randomEntries := getRandomEntries()
+			randomEntries := getRandomEntries(10, 10, 50)
 
 			commitTimestamp, err := client.Post(randomEntries)
 
@@ -163,7 +164,7 @@ var _ = Describe("Server", func() {
 
 	It("Repeatedly puts a random transaction and gets it", func() {
 		for i := 0; i < 20; i++ {
-			randomEntries := getRandomEntries()
+			randomEntries := getRandomEntries(10, 10, 50)
 
 			commitTimestamp, err := client.Put(randomEntries)
 
@@ -181,7 +182,7 @@ var _ = Describe("Server", func() {
 
 	It("Repeatedly puts a random transaction, gets it, and deletes the datastore", func() {
 		for i := 0; i < 20; i++ {
-			randomEntries := getRandomEntries()
+			randomEntries := getRandomEntries(10, 10, 50)
 
 			commitTimestamp, err := client.Put(randomEntries)
 
@@ -204,7 +205,7 @@ var _ = Describe("Server", func() {
 		for i := 0; i < 20; i++ {
 			// Send a PUT request for the first transaction
 
-			randomEntries1 := getRandomEntries()
+			randomEntries1 := getRandomEntries(10, 10, 50)
 
 			commitTimestamp1, err := client.Put(randomEntries1)
 
@@ -222,7 +223,7 @@ var _ = Describe("Server", func() {
 
 			/// Send a POST request for the second transaction
 
-			randomEntries2 := getRandomEntries()
+			randomEntries2 := getRandomEntries(10, 10, 50)
 
 			commitTimestamp2, err := client.Post(randomEntries2)
 
@@ -252,9 +253,13 @@ var _ = Describe("Server", func() {
 		}
 	})
 
-	It("Executes a series of random operations and matches their results to a simulated datastore state", func() {
+	It("Executes a series of random operations and matches their results to a simulated datastore state (compaction disabled)", func() {
 		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "false")
 		Expect(settingErr).To(BeNil())
+
+		const maxEntryCount = 10
+		const maxKeySize = 40
+		const maxValueSize = 20000
 
 		simulator := NewServerDatastoreHandlerSimulator()
 
@@ -262,7 +267,7 @@ var _ = Describe("Server", func() {
 			operationCode := RandomIntInRange(0, 100)
 
 			if operationCode < 5 { // PUT operation
-				randomEntries := getRandomEntries()
+				randomEntries := getRandomEntries(maxEntryCount, maxKeySize, maxValueSize)
 
 				commitTimestamp, clientErr := client.Put(randomEntries)
 
@@ -278,7 +283,8 @@ var _ = Describe("Server", func() {
 					Expect(simulatorErr).To(BeNil())
 				}
 			} else if operationCode < 40 { // POST operation
-				randomEntries := simulator.GetRandomNewAndMutatedEntries()
+				randomEntries := getRandomEntries(maxEntryCount, maxKeySize, maxValueSize)
+				simulator.ReplaceRandomEntriesWithExistingKeyedRandomEntries(randomEntries)
 
 				commitTimestamp, clientErr := client.Post(randomEntries)
 
@@ -293,16 +299,88 @@ var _ = Describe("Server", func() {
 					simulatorErr := simulator.Post(timestampedEntries)
 					Expect(simulatorErr).To(BeNil())
 				}
-			} else if operationCode < 95 { // GET operation
+			} else if operationCode < 97 { // GET operation
 				randomTimestamp := simulator.GetRandomTimestampInCommittedRange()
 				clientResult, clientErr := client.Get(randomTimestamp)
-				mockResult, simulatorErr := simulator.Get(randomTimestamp)
+				simulatorResult, simulatorErr := simulator.Get(randomTimestamp)
 
 				if clientErr != nil {
 					Expect(simulatorErr).NotTo(BeNil())
 				} else {
 					Expect(simulatorErr).To(BeNil())
-					ExpectEntryArraysToBeEqual(clientResult, mockResult)
+					ExpectEntryArraysToBeEqual(clientResult, simulatorResult)
+				}
+			} else { // DELETE operation
+				clientErr := client.Delete()
+				simulatorErr := simulator.Delete()
+
+				if clientErr != nil {
+					Expect(simulatorErr).NotTo(BeNil())
+				} else {
+					Expect(simulatorErr).To(BeNil())
+				}
+			}
+		}
+
+		destroyDatastoreConfig(client.datastoreName)
+	})
+
+	It("Executes a series of random operations and matches their results to a simulated datastore state (compaction enabled)", func() {
+		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "true")
+		Expect(settingErr).To(BeNil())
+
+		const maxEntryCount = 10
+		const maxKeySize = 40
+		const maxValueSize = 20000
+
+		simulator := NewServerDatastoreHandlerSimulator()
+
+		for i := 0; i < 5000; i++ {
+			operationCode := RandomIntInRange(0, 100)
+
+			if operationCode < 7 { // PUT operation
+				randomEntries := getRandomEntries(maxEntryCount, maxKeySize, maxValueSize)
+
+				commitTimestamp, clientErr := client.Put(randomEntries)
+
+				if clientErr != nil {
+					simulatorErr := simulator.Put(randomEntries)
+					Expect(simulatorErr).NotTo(BeNil())
+				} else {
+					timestampedEntries, clientErr := client.Get(commitTimestamp - 1)
+					Expect(clientErr).To(BeNil())
+					ExpectEntryArraysToBeEquivalentWhenCompacted(timestampedEntries[1:], randomEntries)
+
+					simulatorErr := simulator.Put(timestampedEntries)
+					Expect(simulatorErr).To(BeNil())
+				}
+			} else if operationCode < 60 { // POST operation
+				randomEntries := getRandomEntries(maxEntryCount, maxKeySize, maxValueSize)
+				simulator.ReplaceRandomEntriesWithExistingKeyedRandomEntries(randomEntries)
+
+				commitTimestamp, clientErr := client.Post(randomEntries)
+
+				if clientErr != nil {
+					simulatorErr := simulator.Post(randomEntries)
+					Expect(simulatorErr).NotTo(BeNil())
+				} else {
+					timestampedEntries, err := client.Get(commitTimestamp - 1)
+					Expect(err).To(BeNil())
+					ExpectEntryArraysToBeEquivalentWhenCompacted(timestampedEntries, randomEntries)
+
+					simulatorErr := simulator.Post(timestampedEntries)
+					Expect(simulatorErr).To(BeNil())
+				}
+			} else if operationCode < 98 { // GET operation
+				randomTimestamp := simulator.GetRandomTimestampInCommittedRange()
+				clientResult, clientErr := client.Get(randomTimestamp)
+				simulatorResult, simulatorErr := simulator.Get(randomTimestamp)
+
+				if clientErr != nil {
+					Expect(simulatorErr).NotTo(BeNil())
+				} else {
+					Expect(simulatorErr).To(BeNil())
+					ExpectEntryArraysToBeEquivalentWhenCompacted(clientResult, simulatorResult)
 				}
 			} else { // DELETE operation
 				clientErr := client.Delete()

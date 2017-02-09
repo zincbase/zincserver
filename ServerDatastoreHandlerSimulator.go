@@ -48,20 +48,13 @@ func (this *ServerDatastoreHandlerSimulator) Get(updatedAfter int64) ([]Entry, e
 }
 
 // Simulate a GET request and compact the result
-func (this *ServerDatastoreHandlerSimulator) GetAndCompact(updatedAfter int64) (results []Entry, err error) {
-	results, err = this.Get(updatedAfter)
+func (this *ServerDatastoreHandlerSimulator) GetAndCompact(updatedAfter int64) ([]Entry, error) {
+	results, err := this.Get(updatedAfter)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	serializedResults := SerializeEntries(results)
-	compactedSerializedResults, err := CompactEntryStreamBytes(serializedResults);
-
-	if err != nil {
-		return
-	}
-
-	return DeserializeEntryStreamBytes(compactedSerializedResults)
+	return CompactEntries(results), nil
 }
 
 // Simulate a DELETE request.
@@ -95,18 +88,21 @@ func (this *ServerDatastoreHandlerSimulator) GetRandomExistingKey() []byte {
 	return this.entries[RandomIntInRange(1, len(this.entries))].Key
 }
 
-func (this *ServerDatastoreHandlerSimulator) GetRandomNewAndMutatedEntries() []Entry {
-	randomEntries := GenerateRandomEntries(RandomIntInRange(1, 10), RandomIntInRange(1, 100), RandomIntInRange(0, 5000), "randomBinaryEntry")
+func (this *ServerDatastoreHandlerSimulator) ReplaceRandomEntriesWithExistingKeyedRandomEntries(entries []Entry) {
+	if len(entries) <= 1 {
+		return
+	}
 
-	mutationCount := RandomIntInRange(0, len(randomEntries))
+	mutationCount := RandomIntInRange(0, len(entries))
 
 	for i := 0; i < mutationCount; i++ {
 		existingKey := this.GetRandomExistingKey()
 
 		if existingKey != nil {
-			randomEntries[RandomIntInRange(0, len(randomEntries))].Key = existingKey
+			randomIndex := RandomIntInRange(1, len(entries))
+			mutatedEntry := &entries[randomIndex]
+			mutatedEntry.Key = existingKey
+			mutatedEntry.Value = RandomBytes(len(mutatedEntry.Value) + RandomIntInRange(0, 20))
 		}
 	}
-
-	return randomEntries
 }

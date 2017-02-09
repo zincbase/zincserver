@@ -25,33 +25,33 @@ func GenerateRandomEntryStreamBytes(entryCount int, keySize int, valueSize int, 
 	return SerializeEntries(GenerateRandomEntries(entryCount,keySize,valueSize, entryType))
 }
 
-func GenerateRandomEntries(entryCount int, keySize int, valueSize int, entryType string) []Entry {
+func GenerateRandomEntries(entryCount int, maxKeySize int, maxValueSize int, entryType string) []Entry {
 	entries := []Entry{}
 
 	for i := 0; i < entryCount; i++ {
-		var entry *Entry
-
-		switch entryType {
-		case "randomPathEntry":
-			entry = getRandomPathEntry(keySize, valueSize)
-		case "randomPathEntryWithBinaryValue":
-			entry = getRandomPathEntryWithBinaryValue(keySize, valueSize)
-		case "randomUTF8Entry":
-			entry = getRandomUtf8Entry(keySize, valueSize)
-		case "randomBinaryEntry":
-			entry = getRandomBinaryEntry(keySize, valueSize)
-		case "randomAlphanumericEntry":
-			entry = getRandomAlphanumericEntry(keySize, valueSize)
-		case "randomJSONEntry":
-			entry = getRandomJsonEntry(keySize, valueSize)
-		default:
-			panic("Invalid entry type requested: '" + entryType + "'")
-		}
-
-		entries = append(entries, *entry)
+		entries = append(entries, *GenerateRandomEntry(RandomIntInRange(1, maxKeySize), RandomIntInRange(0, maxValueSize), entryType))
 	}
 
 	return entries
+}
+
+func GenerateRandomEntry(keySize int, valueSize int, entryType string) *Entry {
+	switch entryType {
+	case "randomPathEntry":
+		return getRandomPathEntry(keySize, valueSize)
+	case "randomPathEntryWithBinaryValue":
+		return getRandomPathEntryWithBinaryValue(keySize, valueSize)
+	case "randomUTF8Entry":
+		return getRandomUtf8Entry(keySize, valueSize)
+	case "randomBinaryEntry":
+		return  getRandomBinaryEntry(keySize, valueSize)
+	case "randomAlphanumericEntry":
+		return getRandomAlphanumericEntry(keySize, valueSize)
+	case "randomJSONEntry":
+		return getRandomJsonEntry(keySize, valueSize)
+	default:
+		panic("Invalid entry type requested: '" + entryType + "'")
+	}
 }
 
 func getRandomUtf8Entry(keySize int, valueSize int) (result *Entry) {

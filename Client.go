@@ -60,6 +60,17 @@ func (this *Client) GetAndCompact(updatedAfter int64) (results []Entry, err erro
 	return
 }
 
+// Sends a GET request to the server with the given 'updatedAfter' minimum timestamp, and compacts the results
+func (this *Client) GetAndCompact2(updatedAfter int64) (results []Entry, err error) {
+	results, err = this.Get(updatedAfter)
+
+	if err != nil {
+		return
+	}
+
+	return CompactEntries(results), nil
+}
+
 // Sends a POST request to the server with the given entries as a transaction
 func (this *Client) Post(entries []Entry) (commitTimestamp int64, err error) {
 	serializedEntriesBytes := SerializeEntries(entries)

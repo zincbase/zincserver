@@ -5,6 +5,7 @@ import (
 	//"unsafe"
 	"bytes"
 	"crypto/sha1"
+	"encoding/hex"
 	"hash/crc32"
 	"io"
 	"time"
@@ -64,11 +65,11 @@ func RandomWordString(length int) string {
 }
 
 func RandomIntInRange(min int, max int) int {
-	return min + rand.Intn(max - min)
+	return min + rand.Intn(max-min)
 }
 
 func RandomInt63InRange(min int64, max int64) int64 {
-	return min + rand.Int63n(max - min)
+	return min + rand.Int63n(max-min)
 }
 
 func RandomUtf8String(length int, maxCodePoint int) string {
@@ -89,9 +90,14 @@ func Sleep(durationMilliseconds float64) {
 	time.Sleep(time.Duration(int64(durationMilliseconds * float64(time.Millisecond))))
 }
 
-func SHA1(data []byte) string {
-	hash := sha1.New()
-	return string(hash.Sum(data))
+func SHA1ToHex(data []byte) string {
+	hash := sha1.Sum(data)
+	return hex.EncodeToString(hash[:])
+}
+
+func SHA1ToString(data []byte) string {
+	hash := sha1.Sum(data)
+	return string(hash[:])
 }
 
 func CRC32C(data []byte) uint32 {

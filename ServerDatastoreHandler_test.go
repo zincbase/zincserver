@@ -259,14 +259,14 @@ var _ = Describe("Server", func() {
 
 		const maxEntryCount = 10
 		const maxKeySize = 40
-		const maxValueSize = 20000
+		const maxValueSize = 5000
 
 		simulator := NewServerDatastoreHandlerSimulator()
 
 		for i := 0; i < 1000; i++ {
 			operationCode := RandomIntInRange(0, 100)
 
-			if operationCode < 5 { // PUT operation
+			if operationCode < 7 { // PUT operation
 				randomEntries := getRandomEntries(maxEntryCount, maxKeySize, maxValueSize)
 
 				commitTimestamp, clientErr := client.Put(randomEntries)
@@ -282,7 +282,7 @@ var _ = Describe("Server", func() {
 					simulatorErr := simulator.Put(timestampedEntries)
 					Expect(simulatorErr).To(BeNil())
 				}
-			} else if operationCode < 40 { // POST operation
+			} else if operationCode < 70 { // POST operation
 				randomEntries := getRandomEntries(maxEntryCount, maxKeySize, maxValueSize)
 				simulator.ReplaceRandomEntriesWithExistingKeyedRandomEntries(randomEntries)
 
@@ -299,7 +299,7 @@ var _ = Describe("Server", func() {
 					simulatorErr := simulator.Post(timestampedEntries)
 					Expect(simulatorErr).To(BeNil())
 				}
-			} else if operationCode < 97 { // GET operation
+			} else if operationCode < 98 { // GET operation
 				randomTimestamp := simulator.GetRandomTimestampInCommittedRange()
 				clientResult, clientErr := client.Get(randomTimestamp)
 				simulatorResult, simulatorErr := simulator.Get(randomTimestamp)
@@ -331,11 +331,11 @@ var _ = Describe("Server", func() {
 
 		const maxEntryCount = 10
 		const maxKeySize = 40
-		const maxValueSize = 20000
+		const maxValueSize = 5000
 
 		simulator := NewServerDatastoreHandlerSimulator()
 
-		for i := 0; i < 5000; i++ {
+		for i := 0; i < 1000; i++ {
 			operationCode := RandomIntInRange(0, 100)
 
 			if operationCode < 7 { // PUT operation
@@ -354,7 +354,7 @@ var _ = Describe("Server", func() {
 					simulatorErr := simulator.Put(timestampedEntries)
 					Expect(simulatorErr).To(BeNil())
 				}
-			} else if operationCode < 60 { // POST operation
+			} else if operationCode < 70 { // POST operation
 				randomEntries := getRandomEntries(maxEntryCount, maxKeySize, maxValueSize)
 				simulator.ReplaceRandomEntriesWithExistingKeyedRandomEntries(randomEntries)
 

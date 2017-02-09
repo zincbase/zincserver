@@ -88,12 +88,14 @@ func (this *ServerDatastoreHandlerSimulator) GetRandomExistingKey() []byte {
 	return this.entries[RandomIntInRange(1, len(this.entries))].Key
 }
 
+// Takes a series of entries and randomly replaces some of them with random entries with keys
+// that already exist in the datastore
 func (this *ServerDatastoreHandlerSimulator) ReplaceRandomEntriesWithExistingKeyedRandomEntries(entries []Entry) {
 	if len(entries) <= 1 {
 		return
 	}
 
-	mutationCount := RandomIntInRange(0, len(entries))
+	mutationCount := RandomIntInRange(len(entries) / 2, len(entries))
 
 	for i := 0; i < mutationCount; i++ {
 		existingKey := this.GetRandomExistingKey()

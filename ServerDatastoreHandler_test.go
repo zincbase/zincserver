@@ -29,7 +29,7 @@ var _ = Describe("Server", func() {
 
 	const host = "http://localhost:12345"
 
-	setGlobalServerSetting := func(key string, value string) (err error) {
+	/*setGlobalSetting*/ _ = func(key string, value string) (err error) {
 		globalConfigClient := NewClient(host, ".config", "")
 
 		_, err = globalConfigClient.Post([]Entry{
@@ -42,6 +42,26 @@ var _ = Describe("Server", func() {
 		})
 
 		return
+	}
+
+	setDatastoreSetting := func(datastoreName string, key string, value string) (err error) {
+		datastoreConfigClient := NewClient(host, datastoreName+".config", "")
+
+		_, err = datastoreConfigClient.PostOrPut([]Entry{
+			Entry{
+				PrimaryHeader:        &EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON},
+				SecondaryHeaderBytes: nil,
+				Key:                  []byte(key),
+				Value:                []byte(value),
+			},
+		})
+
+		return
+	}
+
+	destroyDatastoreConfig := func(datastoreName string) {
+		datastoreConfigClient := NewClient(host, datastoreName+".config", "")
+		datastoreConfigClient.Delete()
 	}
 
 	var testEntries []Entry
@@ -233,10 +253,10 @@ var _ = Describe("Server", func() {
 	})
 
 	It("Executes a series of random operations and matches their results to a simulated datastore state", func() {
-		settingErr := setGlobalServerSetting(`"['datastore']['compaction']['enabled']"`, "false")
+		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "false")
 		Expect(settingErr).To(BeNil())
 
-		mock := NewServerDatastoreHandlerMock()
+		simulator := NewServerDatastoreHandlerSimulator()
 
 		for i := 0; i < 1000; i++ {
 			operationCode := RandomIntInRange(0, 100)
@@ -247,58 +267,56 @@ var _ = Describe("Server", func() {
 				commitTimestamp, clientErr := client.Put(randomEntries)
 
 				if clientErr != nil {
-					mockErr := mock.Put(randomEntries)
-					Expect(mockErr).NotTo(BeNil())
+					simulatorErr := simulator.Put(randomEntries)
+					Expect(simulatorErr).NotTo(BeNil())
 				} else {
 					timestampedEntries, clientErr := client.Get(commitTimestamp - 1)
 					Expect(clientErr).To(BeNil())
 					ExpectEntryArraysToBeEquivalent(timestampedEntries[1:], randomEntries)
 
-					mockErr := mock.Put(timestampedEntries)
-					Expect(mockErr).To(BeNil())
+					simulatorErr := simulator.Put(timestampedEntries)
+					Expect(simulatorErr).To(BeNil())
 				}
 			} else if operationCode < 40 { // POST operation
-				randomEntries := mock.GetRandomNewAndMutatedEntries()
+				randomEntries := simulator.GetRandomNewAndMutatedEntries()
 
 				commitTimestamp, clientErr := client.Post(randomEntries)
 
 				if clientErr != nil {
-					mockErr := mock.Post(randomEntries)
-					Expect(mockErr).NotTo(BeNil())
+					simulatorErr := simulator.Post(randomEntries)
+					Expect(simulatorErr).NotTo(BeNil())
 				} else {
 					timestampedEntries, err := client.Get(commitTimestamp - 1)
 					Expect(err).To(BeNil())
 					ExpectEntryArraysToBeEquivalent(timestampedEntries, randomEntries)
 
-					mockErr := mock.Post(timestampedEntries)
-					Expect(mockErr).To(BeNil())
+					simulatorErr := simulator.Post(timestampedEntries)
+					Expect(simulatorErr).To(BeNil())
 				}
 			} else if operationCode < 95 { // GET operation
-				randomTimestamp := mock.GetRandomTimestampInCommittedRange()
+				randomTimestamp := simulator.GetRandomTimestampInCommittedRange()
 				clientResult, clientErr := client.Get(randomTimestamp)
-				mockResult, mockErr := mock.Get(randomTimestamp)
+				mockResult, simulatorErr := simulator.Get(randomTimestamp)
 
 				if clientErr != nil {
-					Expect(mockErr).NotTo(BeNil())
+					Expect(simulatorErr).NotTo(BeNil())
 				} else {
-					Expect(mockErr).To(BeNil())
+					Expect(simulatorErr).To(BeNil())
 					ExpectEntryArraysToBeEqual(clientResult, mockResult)
 				}
 			} else { // DELETE operation
 				clientErr := client.Delete()
-				mockErr := mock.Delete()
+				simulatorErr := simulator.Delete()
 
 				if clientErr != nil {
-					Expect(mockErr).NotTo(BeNil())
+					Expect(simulatorErr).NotTo(BeNil())
 				} else {
-					Expect(mockErr).To(BeNil())
+					Expect(simulatorErr).To(BeNil())
 				}
 			}
 		}
 
-		// Revert to defualt compaction setting
-		settingErr = setGlobalServerSetting(`"['datastore']['compaction']['enabled']"`, "true")
-		Expect(settingErr).To(BeNil())
+		destroyDatastoreConfig(client.datastoreName)
 	})
 
 	It("Errors on GET requests to non-existing datastores", func() {

@@ -95,7 +95,7 @@ func (this *ServerDatastoreHandlerSimulator) ReplaceRandomEntriesWithExistingKey
 		return
 	}
 
-	mutationCount := RandomIntInRange(len(entries) / 2, len(entries))
+	mutationCount := RandomIntInRange(0, len(entries))
 
 	for i := 0; i < mutationCount; i++ {
 		existingKey := this.GetRandomExistingKey()

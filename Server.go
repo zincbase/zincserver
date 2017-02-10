@@ -211,6 +211,7 @@ func DefaultServerConfig(masterKey string) []byte {
 
 	defaultConfigStringEntries := []JsonEntry{
 		JsonEntry{`"['server']['masterKeyHash']"`, `"` + masterKeyHashHex + `"`},
+
 		JsonEntry{`"['server']['http']['loopbackOnly']"`, `false`},
 		JsonEntry{`"['server']['https']['loopbackOnly']"`, `false`},
 
@@ -221,14 +222,14 @@ func DefaultServerConfig(masterKey string) []byte {
 
 		JsonEntry{`"['datastore']['flush']['enabled']"`, `true`},
 		JsonEntry{`"['datastore']['flush']['maxDelay']"`, `1000`},
+
 		JsonEntry{`"['datastore']['limit']['maxSize']"`, `100000000`},
 
 		JsonEntry{`"['datastore']['CORS']['origin']['*']['allowed']"`, `true`},
 
 		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['allowed']"`, `true`},
 		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['param']['updatedAfter']['allowed']"`, `true`},
-		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['param']['waitUntilNonempty']['allowed']"`, `false`},
-		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['param']['compact']['allowed']"`, `false`},
+		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['param']['waitUntilNonempty']['allowed']"`, `true`},
 		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"`, `2000`},
 		JsonEntry{`"['accessProfile']['Reader']['method']['GET']['limit']['requests']['count']"`, `10`},
 		JsonEntry{`"['accessProfile']['Reader']['method']['WebSocket']['allowed']"`, `true`},
@@ -237,8 +238,7 @@ func DefaultServerConfig(masterKey string) []byte {
 
 		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['allowed']"`, `true`},
 		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['param']['updatedAfter']['allowed']"`, `true`},
-		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['param']['waitUntilNonempty']['allowed']"`, `false`},
-		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['param']['compact']['allowed']"`, `false`},
+		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['param']['waitUntilNonempty']['allowed']"`, `true`},
 		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['limit']['requests']['interval']"`, `2000`},
 		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['GET']['limit']['requests']['count']"`, `10`},
 		JsonEntry{`"['accessProfile']['ReaderWriter']['method']['WebSocket']['allowed']"`, `true`},

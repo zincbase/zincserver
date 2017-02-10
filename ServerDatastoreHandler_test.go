@@ -6,6 +6,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	// "log"
+	"encoding/hex"
+	"os"
 )
 
 var _ = Describe("Server", func() {
@@ -30,8 +32,8 @@ var _ = Describe("Server", func() {
 
 	const host = "http://localhost:12345"
 
-	/*setGlobalSetting*/ _ = func(key string, value string) (err error) {
-		globalConfigClient := NewClient(host, ".config", "")
+	setGlobalSetting := func(key string, value string, accessKey string) (err error) {
+		globalConfigClient := NewClient(host, ".config", accessKey)
 
 		_, err = globalConfigClient.Post([]Entry{
 			Entry{
@@ -45,8 +47,8 @@ var _ = Describe("Server", func() {
 		return
 	}
 
-	setDatastoreSetting := func(datastoreName string, key string, value string) (err error) {
-		datastoreConfigClient := NewClient(host, datastoreName+".config", "")
+	setDatastoreSetting := func(datastoreName string, key string, value string, accessKey string) (err error) {
+		datastoreConfigClient := NewClient(host, datastoreName+".config", accessKey)
 
 		_, err = datastoreConfigClient.PostOrPut([]Entry{
 			Entry{
@@ -80,6 +82,10 @@ var _ = Describe("Server", func() {
 		client.Delete()
 		server.Stop()
 		time.Sleep(10 * time.Millisecond)
+	})
+
+	AfterSuite(func() {
+		os.Remove(config.StoragePath + ".config")
 	})
 
 	It("Puts and gets entries", func() {
@@ -254,8 +260,9 @@ var _ = Describe("Server", func() {
 	})
 
 	It("Executes a series of random operations and matches their results to a simulated datastore state (compaction disabled)", func() {
-		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "false")
+		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "false", "")
 		Expect(settingErr).To(BeNil())
+		defer destroyDatastoreConfig(client.datastoreName)
 
 		const maxEntryCount = 10
 		const maxKeySize = 40
@@ -263,7 +270,7 @@ var _ = Describe("Server", func() {
 
 		simulator := NewServerDatastoreHandlerSimulator()
 
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 100; i++ {
 			operationCode := RandomIntInRange(0, 100)
 
 			if operationCode < 7 { // PUT operation
@@ -326,8 +333,12 @@ var _ = Describe("Server", func() {
 	})
 
 	It("Executes a series of random operations and matches their results to a simulated datastore state (compaction enabled)", func() {
-		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "true")
+		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "true", "")
 		Expect(settingErr).To(BeNil())
+
+		settingErr = setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['minUnusedSizeRatio']"`, "0.1", "")
+		Expect(settingErr).To(BeNil())
+		defer destroyDatastoreConfig(client.datastoreName)
 
 		const maxEntryCount = 10
 		const maxKeySize = 40
@@ -335,7 +346,7 @@ var _ = Describe("Server", func() {
 
 		simulator := NewServerDatastoreHandlerSimulator()
 
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 100; i++ {
 			operationCode := RandomIntInRange(0, 100)
 
 			if operationCode < 7 { // PUT operation
@@ -393,8 +404,6 @@ var _ = Describe("Server", func() {
 				}
 			}
 		}
-
-		destroyDatastoreConfig(client.datastoreName)
 	})
 
 	It("Errors on GET requests to non-existing datastores", func() {
@@ -430,6 +439,63 @@ var _ = Describe("Server", func() {
 			Entry{nil, []byte{}, []byte{}, []byte{1, 2, 3}},
 		})
 
+		Expect(err).NotTo(BeNil())
+	})
+
+	It("Rejects requests with invalid master keys", func() {
+		// Generate master key
+		masterKey := hex.EncodeToString(RandomBytes(16))
+		masterKeyHash := SHA1ToHex([]byte(masterKey))
+		setGlobalSetting(`"['server']['masterKeyHash']"`, `"`+masterKeyHash+`"`, "")
+		defer setGlobalSetting(`"['server']['masterKeyHash']"`, `""`, masterKey)
+
+		// Test client with valid access key
+		clientWithValidAccessKey := NewClient(host, client.datastoreName, masterKey)
+		_, err := clientWithValidAccessKey.Put(testEntries)
+		Expect(err).To(BeNil())
+		_, err = clientWithValidAccessKey.Post(testEntries)
+		Expect(err).To(BeNil())
+		_, err = clientWithValidAccessKey.Get(0)
+		Expect(err).To(BeNil())
+
+		// Test client with invalid access key
+		invalidMasterKey := hex.EncodeToString(RandomBytes(16))
+		clientWithInvalidAccessKey := NewClient(host, client.datastoreName, invalidMasterKey)
+
+		_, err = clientWithInvalidAccessKey.Put(testEntries)
+		Expect(err).NotTo(BeNil())
+		_, err = clientWithInvalidAccessKey.Post(testEntries)
+		Expect(err).NotTo(BeNil())
+		_, err = clientWithInvalidAccessKey.Get(0)
+		Expect(err).NotTo(BeNil())
+	})
+
+	It("Rejects requests with invalid datastore access keys", func() {
+		// Generate access key
+		accessKey := hex.EncodeToString(RandomBytes(16))
+		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['` + accessKeyHash + `']"`, `"ReaderWriter"`, "")
+		Expect(settingErr).To(BeNil())
+		defer destroyDatastoreConfig(client.datastoreName)
+
+		// Test client with valid access key
+		clientWithValidAccessKey := NewClient(host, client.datastoreName, accessKey)
+		_, err := clientWithValidAccessKey.Put(testEntries)
+		Expect(err).To(BeNil())
+		_, err = clientWithValidAccessKey.Post(testEntries)
+		Expect(err).To(BeNil())
+		_, err = clientWithValidAccessKey.Get(0)
+		Expect(err).To(BeNil())
+
+		// Test client with invalid access key
+		invalidMasterKey := hex.EncodeToString(RandomBytes(16))
+		clientWithInvalidAccessKey := NewClient(host, client.datastoreName, invalidMasterKey)
+
+		_, err = clientWithInvalidAccessKey.Put(testEntries)
+		Expect(err).NotTo(BeNil())
+		_, err = clientWithInvalidAccessKey.Post(testEntries)
+		Expect(err).NotTo(BeNil())
+		_, err = clientWithInvalidAccessKey.Get(0)
 		Expect(err).NotTo(BeNil())
 	})
 })

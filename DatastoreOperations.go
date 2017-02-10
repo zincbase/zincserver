@@ -909,7 +909,7 @@ func (this *DatastoreOperationsEntry) loadHeadEntry() error {
 func (this *DatastoreOperationsEntry) storeHeadEntry() (err error) {
 	// If the cached head entry value doesn't exist, error
 	if this.headEntryValue == nil {
-		return errors.New("No head entry is not loaded")
+		return errors.New("No head entry is loaded")
 	}
 
 	// If the creation time is 0, error

@@ -498,4 +498,25 @@ var _ = Describe("Server", func() {
 		_, err = clientWithInvalidAccessKey.Get(0)
 		Expect(err).NotTo(BeNil())
 	})
+
+	It("Rejects requests methods that are not allowed by the profile", func() {
+		// Generate access key
+		accessKey := hex.EncodeToString(RandomBytes(16))
+		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['` + accessKeyHash + `']"`, `"Reader"`, "")
+		Expect(settingErr).To(BeNil())
+		defer destroyDatastoreConfig(client.datastoreName)
+
+		// Put initial data in the datastore
+		client.Put(testEntries)
+
+		// Test client with valid access key
+		clientWithValidAccessKey := NewClient(host, client.datastoreName, accessKey)
+		_, err := clientWithValidAccessKey.Put(testEntries)
+		Expect(err).NotTo(BeNil())
+		_, err = clientWithValidAccessKey.Post(testEntries)
+		Expect(err).NotTo(BeNil())
+		_, err = clientWithValidAccessKey.Get(0)
+		Expect(err).To(BeNil())
+	})
 })

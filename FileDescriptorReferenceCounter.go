@@ -26,7 +26,7 @@ func (this *FileDescriptorCounterMap) OpenAndIncrement(name string, flag int, pe
 		this.counterMap[file.Fd()] = 1
 	}
 
-	//log.Printf("OpenAndIncrement %d", file.Fd())
+	//Logf("OpenAndIncrement %d", file.Fd())
 	this.Unlock()
 	return
 }
@@ -36,7 +36,7 @@ func (this *FileDescriptorCounterMap) Increment(file *os.File) error {
 	defer this.Unlock()
 
 	fd := file.Fd()
-	//log.Printf("Increment %d", fd)
+	//Logf("Increment %d", fd)
 
 	if this.counterMap[fd] == 0 {
 		return errors.New("Attempt to increment 0 counter without opening a file")
@@ -52,7 +52,7 @@ func (this *FileDescriptorCounterMap) Decrement(file *os.File) (err error) {
 	defer this.Unlock()
 
 	fd := file.Fd()
-	//log.Printf("Decrement %d", fd)
+	//Logf("Decrement %d", fd)
 
 	if this.counterMap[fd] == 0 {
 		return errors.New("Attempt to decrement a 0 counter")
@@ -63,7 +63,7 @@ func (this *FileDescriptorCounterMap) Decrement(file *os.File) (err error) {
 	if this.counterMap[fd] == 0 {
 		delete(this.counterMap, fd)
 		err = file.Close()
-		//log.Printf("Close %d", fd)
+		//Logf("Close %d", fd)
 	}
 
 	return

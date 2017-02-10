@@ -28,14 +28,23 @@ type Server struct {
 }
 
 type ServerStartupOptions struct {
-	InsecurePort    int64
-	SecurePort      int64
+	InsecurePort    int
+	SecurePort      int
 	EnableHTTP2     bool
 	CertFile        string
 	KeyFile         string
 	StoragePath     string
-	LogLevel        int64
+	LogLevel        int
 	NoAutoMasterKey bool
+}
+
+func NewServer(startupOptions *ServerStartupOptions) *Server {
+	return &Server{
+		datastoreOperationEntries: make(map[string]*DatastoreOperationsEntry),
+		operationsMapLock:         &sync.Mutex{},
+		startupOptions:            startupOptions,
+		runningStateWaitGroup:     &sync.WaitGroup{},
+	}
 }
 
 func (this *Server) Start() {
@@ -65,9 +74,9 @@ func (this *Server) Start() {
 				newMasterKey = hex.EncodeToString(newMasterKeyBytes)
 			}
 
-			fmt.Println("No configuration datastore found.")
-			fmt.Println("Creating default one with master key '" + newMasterKey + "'.")
-			fmt.Println("")
+			this.Log(0, "No configuration datastore found.")
+			this.Log(0, "Creating default one with master key '" + newMasterKey + "'.")
+			this.Log(0, "")
 
 			_, err = this.globalConfigDatastoreOperations.Rewrite(DefaultServerConfig(newMasterKey))
 			if err != nil {
@@ -104,29 +113,39 @@ func (this *Server) Start() {
 		}
 
 		listenerAddress := fmt.Sprintf(":%d", this.startupOptions.SecurePort)
-		secureListener, err := tls.Listen("tcp", listenerAddress, &tlsConfig)
+		tlsListener, err := tls.Listen("tcp", listenerAddress, &tlsConfig)
 		if err != nil {
 			panic(err.Error())
 		}
-		this.secureListener = NewServerListener(this, secureListener, "https")
+		this.secureListener = NewServerListener(this, tlsListener, "https")
 
-		go http.Serve(this.secureListener, NewServerHandler(this))
 		this.runningStateWaitGroup.Add(1)
-		log.Printf("Started secure server at port %d", this.startupOptions.SecurePort)
+		go func() {
+			http.Serve(this.secureListener, NewServerHandler(this))
+			this.runningStateWaitGroup.Done()
+			this.Logf(0, "Secure listener at port %d has been closed", this.startupOptions.SecurePort)
+		}()
+
+		this.Logf(0, "Started secure listener at port %d", this.startupOptions.SecurePort)
 	}
 
 	if this.startupOptions.InsecurePort > 0 {
 		// Start HTTP Listener
 		listenerAddress := fmt.Sprintf(":%d", this.startupOptions.InsecurePort)
-		insecureListener, err := net.Listen("tcp", listenerAddress)
+		tcpListener, err := net.Listen("tcp", listenerAddress)
 		if err != nil {
 			panic(err)
 		}
-		this.insecureListener = NewServerListener(this, insecureListener, "http")
+		this.insecureListener = NewServerListener(this, tcpListener, "http")
 
-		go http.Serve(this.insecureListener, NewServerHandler(this))
 		this.runningStateWaitGroup.Add(1)
-		log.Printf("Started insecure server at port %d", this.startupOptions.InsecurePort)
+		go func() {
+			http.Serve(this.insecureListener, NewServerHandler(this))
+			this.runningStateWaitGroup.Done()
+			Logf("Insecure listener at port %d has been closed", this.startupOptions.InsecurePort)
+		}()
+
+		this.Logf(0, "Started insecure listener at port %d", this.startupOptions.InsecurePort)
 	}
 }
 
@@ -134,21 +153,31 @@ func (this *Server) Stop() {
 	if this.insecureListener != nil {
 		this.insecureListener.Close()
 		this.insecureListener = nil
-		this.runningStateWaitGroup.Done()
 	}
 
 	if this.secureListener != nil {
 		this.secureListener.Close()
 		this.secureListener = nil
-		this.runningStateWaitGroup.Done()
+	}
+	this.runningStateWaitGroup.Wait()
+
+	for _, operationsEntry := range this.datastoreOperationEntries {
+		operationsEntry.Release()
 	}
 }
 
-func (this *Server) Log(message string, logLevel int64) {
+func (this *Server) Log(logLevel int, values ...interface{}) {
 	if this.startupOptions.LogLevel >= logLevel {
-		log.Println(message)
+		log.Println(values...)
 	}
 }
+
+func (this *Server) Logf(logLevel int, format string, values ...interface{}) {
+	if this.startupOptions.LogLevel >= logLevel {
+		log.Printf(format, values...)
+	}
+}
+
 
 func (this *Server) GetDatastoreOperations(datastoreName string) (datastoreOperations *DatastoreOperationsEntry) {
 	// Create a new entry if it truly doesn't exist
@@ -175,28 +204,6 @@ func (this *Server) GlobalConfig() *VarMap {
 		return globalConfig
 	} else {
 		return NewEmptyVarMap()
-	}
-}
-
-func NewServer(startupOptions *ServerStartupOptions) *Server {
-	return &Server{
-		datastoreOperationEntries: make(map[string]*DatastoreOperationsEntry),
-		operationsMapLock:         &sync.Mutex{},
-		startupOptions:            startupOptions,
-		runningStateWaitGroup:     &sync.WaitGroup{},
-	}
-}
-
-func DefaultServerStartupOptions() *ServerStartupOptions {
-	return &ServerStartupOptions{
-		InsecurePort:    0,
-		SecurePort:      0,
-		CertFile:        "cert.pem",
-		KeyFile:         "key.pem",
-		EnableHTTP2:     false,
-		StoragePath:     "",
-		LogLevel:        1,
-		NoAutoMasterKey: false,
 	}
 }
 
@@ -255,4 +262,17 @@ func DefaultServerConfig(masterKey string) []byte {
 	defaultConfigSerialized := SerializeJsonEntries(defaultConfigStringEntries)
 
 	return defaultConfigSerialized
+}
+
+func DefaultServerStartupOptions() *ServerStartupOptions {
+	return &ServerStartupOptions{
+		InsecurePort:    0,
+		SecurePort:      0,
+		CertFile:        "cert.pem",
+		KeyFile:         "key.pem",
+		EnableHTTP2:     false,
+		StoragePath:     "",
+		LogLevel:        1,
+		NoAutoMasterKey: false,
+	}
 }

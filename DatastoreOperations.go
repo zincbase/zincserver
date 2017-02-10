@@ -137,7 +137,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		// If file ended unexpectedly, was corrupted or last entry didn't include a transaction end marker
 		if err == io.ErrUnexpectedEOF || err == ErrCorruptedEntry || fileSize == 0 {
 			// Log message
-			this.parentServer.Log(fmt.Sprintf("An incomplete or corrupted transcacion found in datastore '%s'. Attempting repair..", this.name), 1)
+			this.parentServer.Logf(1, "An incomplete or corrupted transcacion found in datastore '%s'. Attempting repair..", this.name)
 
 			// Attempt to roll back to last succesful transaction, this would also attempt to
 			// reload the index if the repair operation has succeeded
@@ -194,14 +194,14 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 			// If an error occurred when renaming the file
 			if renameErr != nil {
 				// Log a message
-				this.parentServer.Log(fmt.Sprintf("Datastore '%s' cannot be opened as it has an invalid, missing or corrupted head entry. Trying to rename the file has failed due to error: %s.", this.name, renameErr.Error()), 1)
+				this.parentServer.Logf(1, "Datastore '%s' cannot be opened as it has an invalid, missing or corrupted head entry. Trying to rename the file has failed due to error: %s.", this.name, renameErr.Error())
 			} else {
 				// Log a message
-				this.parentServer.Log(fmt.Sprintf("Datastore '%s' cannot be opened as it has an invalid, missing or corrupted head entry. The file has been renamed to '%s'.", this.name, newFilePath), 1)
+				this.parentServer.Logf(1, "Datastore '%s' cannot be opened as it has an invalid, missing or corrupted head entry. The file has been renamed to '%s'.", this.name, newFilePath)
 			}
 		} else { // Otherwise
 			// Log a message
-			this.parentServer.Log(fmt.Sprintf("Datastore '%s' cannot be opened due to an unexpected error while trying to load its head entry: %s", this.name, err.Error()), 1)
+			this.parentServer.Logf(1, "Datastore '%s' cannot be opened due to an unexpected error while trying to load its head entry: %s", this.name, err.Error())
 		}
 
 		// Release and return the error
@@ -250,7 +250,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 	}
 
 	// Log a completion message
-	this.parentServer.Log(fmt.Sprintf("Loaded datastore '%s' in %fms", this.name, MonoUnixTimeMilliFloat()-startTime), 1)
+	this.parentServer.Logf(1, "Loaded datastore '%s' in %fms", this.name, MonoUnixTimeMilliFloat()-startTime)
 	return
 }
 
@@ -489,10 +489,10 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 		// If no error while executing the operation
 		if err == nil {
 			// Log a success message
-			this.parentServer.Log(fmt.Sprintf("Flushed datastore '%s' in %dms", this.name, MonoUnixTimeMilli()-startTime), 1)
+			this.parentServer.Logf(1, "Flushed datastore '%s' in %dms", this.name, MonoUnixTimeMilli()-startTime)
 		} else { // Otherwise,
 			// Log a failure message
-			this.parentServer.Log(fmt.Sprintf("Error flushing datastore '%s'. %s", this.name, err.Error()), 1)
+			this.parentServer.Log(1, "Error flushing datastore '%s'. %s", this.name, err.Error())
 		}
 	}
 
@@ -668,7 +668,7 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 	}
 
 	// Log message
-	this.parentServer.Log(fmt.Sprintf("Compacted datastore '%s' from %d to %d bytes in %dms", this.name, currentSize, compactedSize, MonoUnixTimeMilli()-startTime), 1)
+	this.parentServer.Logf(1, "Compacted datastore '%s' from %d to %d bytes in %dms", this.name, currentSize, compactedSize, MonoUnixTimeMilli()-startTime)
 
 	// Return without error
 	return true, nil
@@ -773,7 +773,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 	// If the truncated datastore size is equal to the current size of the datastore
 	if repairedSize > 0 && repairedSize == originalSize {
 		// No need to repair anything
-		this.parentServer.Log(fmt.Sprintf("No need to repair datastore '%s'.", this.name), 1)
+		this.parentServer.Logf(1, "No need to repair datastore '%s'.", this.name)
 		return
 	}
 
@@ -784,7 +784,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 	// If an error occurred when creating a backup file
 	if err != nil {
 		// Log a message
-		this.parentServer.Log(fmt.Sprintf("Error while creating a backup of corrupted datastore '%s': %s.", this.name, err.Error()), 1)
+		this.parentServer.Logf(1, "Error while creating a backup of corrupted datastore '%s': %s.", this.name, err.Error())
 
 		// Return the error
 		return
@@ -796,7 +796,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 	// If an error occurred when truncating the file
 	if err != nil {
 		// Log a message
-		this.parentServer.Log(fmt.Sprintf("Error while reparing datastore '%s': %s", this.name, err.Error()), 1)
+		this.parentServer.Logf(1, "Error while reparing datastore '%s': %s", this.name, err.Error())
 
 		// Return the error
 		return
@@ -808,7 +808,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 	// If an error occurred while seeking the file
 	if err != nil {
 		// Log a message
-		this.parentServer.Log(fmt.Sprintf("Error while repairing datastore '%s': %s", this.name, err.Error()), 1)
+		this.parentServer.Log(1, "Error while repairing datastore '%s': %s", this.name, err.Error())
 
 		// Return the error
 		return
@@ -836,10 +836,10 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 	// If an error occurred when recreating the index
 	if err != nil {
 		// Log a message
-		this.parentServer.Log(fmt.Sprintf("Failed to recreate index for datastore '%s' after repair.", this.name), 1)
+		this.parentServer.Logf(1, "Failed to recreate index for datastore '%s' after repair.", this.name)
 	} else { // Otherwise
 		// Log a message
-		this.parentServer.Log(fmt.Sprintf("Repaired datastore '%s'. Original size %d bytes, Repaired size %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, originalSize, repairedSize, backupFilePath), 1)
+		this.parentServer.Logf(1, "Repaired datastore '%s'. Original size %d bytes, Repaired size %d bytes. A backup of the corrupted datastore file has been saved to '%s'.", this.name, originalSize, repairedSize, backupFilePath)
 	}
 
 	return
@@ -1099,7 +1099,7 @@ func (this *DatastoreOperationsEntry) GetColisionFreeTimestamp() (timestamp int6
 		sleepTimeMilli := float64(lastModifiedTime - timestamp + 1) / 1000
 
 		// Log a message
-		this.parentServer.Log(fmt.Sprintf("The last modification time of datastore '%s' is greater than current time. Sleeping for %f.3ms until the anomaly is resolved..", this.name, sleepTimeMilli), 1)
+		this.parentServer.Logf(1, "The last modification time of datastore '%s' is greater than current time. Sleeping for %f.3ms until the anomaly is resolved..", this.name, sleepTimeMilli)
 
 		// Sleep until timestamp is strictly greater than the last modification time
 		Sleep(sleepTimeMilli)

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 )
 
 func GenerateRandomDatastore(filePath string, entryCount int, keySize int, valueSize int, entryType string) (err error) {
@@ -13,11 +12,11 @@ func GenerateRandomDatastore(filePath string, entryCount int, keySize int, value
 
 	err = CreateOrRewriteFileSafe(filePath, CreateNewDatastoreReaderFromBytes(entryStreamBuffer, creationTimestamp))
 	if err != nil {
-		log.Printf("Failed storing '%s'\n", filePath)
+		Logf("Failed storing '%s'\n", filePath)
 		return
 	}
 
-	log.Printf("Datastore '%s' generated in %.3fms\n", filePath, MonoUnixTimeMilliFloat()-startTime)
+	Logf("Datastore '%s' generated in %.3fms\n", filePath, MonoUnixTimeMilliFloat()-startTime)
 	return
 }
 

@@ -46,7 +46,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	// If no valid datastore name was found
 	if len(submatches) == 0 || len(submatches[1]) == 0 || len(submatches[1]) > 128 {
 		// Log a message
-		this.parentServer.Log("["+r.RemoteAddr+"]: "+r.Method+" "+r.URL.Path+" <invalid path>", 1)
+		this.parentServer.Log(1, "["+r.RemoteAddr+"]: "+r.Method+" "+r.URL.Path+" <invalid path>")
 
 		// Ensure that cross-origin requests will also be able to receive the error
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -120,9 +120,9 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 				message += fmt.Sprintf("%s: %s\n", k, v)
 			}
 
-			this.parentServer.Log(message, 2)
+			this.parentServer.Log(2, message)
 		} else if logLevel == 1 {
-			this.parentServer.Log("["+r.RemoteAddr+"]: "+method+" "+secureURI, 1)
+			this.parentServer.Log(1, "["+r.RemoteAddr+"]: "+method+" "+secureURI)
 		}
 	}
 
@@ -226,7 +226,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	// If an error occured, and wasn't properly handled to end the request, end the request
 	// with an 'Internal Server Error' response
 	if err != nil {
-		this.parentServer.Log(fmt.Sprint(err), 1)
+		this.parentServer.Log(1, err)
 		endRequestWithError(w, r, http.StatusInternalServerError, err)
 	}
 }
@@ -362,9 +362,9 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 				ws.Close()
 				return
 			//case websocket.PingMessage:
-			//	log.Println("ping")
+			//	Log("ping")
 			//case websocket.PongMessage:
-			//	log.Println("pong")
+			//	Log("pong")
 			//case default:
 			}
 		}

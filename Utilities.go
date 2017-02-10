@@ -9,6 +9,7 @@ import (
 	"hash/crc32"
 	"io"
 	"time"
+	"log"
 )
 
 var CastagnoliCRC32Table *crc32.Table
@@ -18,6 +19,15 @@ func init() {
 	CastagnoliCRC32Table = crc32.MakeTable(crc32.Castagnoli)
 	globalRand = rand.New(rand.NewSource(int64(time.Now().UnixNano())))
 }
+
+func Log(v ...interface{}) {
+	log.Println(v...)
+}
+
+func Logf(format string, v ...interface{}) {
+	log.Printf(format, v...)
+}
+
 
 func MinInt(a, b int) int {
 	if a < b {

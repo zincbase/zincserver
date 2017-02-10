@@ -92,7 +92,7 @@ var _ = Describe("PrefetchingReaderAt", func() {
 			readOffset := random.Intn(100000)
 			readLength := random.Intn(100000 - readOffset)
 
-			//log.Printf("Read offset: %d, Read length: %d", readOffset, readLength)
+			//Logf("Read offset: %d, Read length: %d", readOffset, readLength)
 
 			buf := make([]byte, readLength)
 			n, err := reader.ReadAt(buf, int64(readOffset))

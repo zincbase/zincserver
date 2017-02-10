@@ -99,9 +99,6 @@ var _ = Describe("Server", func() {
 
 		Expect(err).To(BeNil())
 
-		//log.Println(returnedEntries)
-		//log.Println(testEntries[0:2])
-
 		ExpectEntryArraysToBeEquivalent(returnedEntries[1:], testEntries[0:2])
 
 		Expect(returnedEntries[0].Key).To(HaveLen(0))

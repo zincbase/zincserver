@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+	//"log"
 )
 
 // Declare the datastore handler object type
@@ -343,6 +344,31 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 	if err != nil {
 		return
 	}
+
+	// Handle messages sents by the client
+	go func() {
+		for {
+			messageType, _, err := ws.NextReader()
+
+			// If an error occurred while reading the next message
+			if err != nil {
+				// return the error
+				return
+			}
+
+			switch messageType {
+			// Immediately terminate the connection if the client sends a binary or text message
+			case websocket.BinaryMessage, websocket.TextMessage:
+				ws.Close()
+				return
+			//case websocket.PingMessage:
+			//	log.Println("ping")
+			//case websocket.PongMessage:
+			//	log.Println("pong")
+			//case default:
+			}
+		}
+	}()
 
 	for {
 		// Lock the datastore for reading

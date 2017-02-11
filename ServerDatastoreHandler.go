@@ -326,12 +326,37 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 
 	// If a negative value was given, error
 	if updatedAfter < 0 {
-		operations.RUnlock()
-
 		endRequestWithError(w, r, http.StatusBadRequest, errors.New("Timestamp threshold must be greater or equal to 0"))
-
 		return
 	}
+
+	//
+	// Ensure the datastore exists
+	//
+	// Lock the datastore for reading
+	operations.RLock()
+
+	// Load the datastore if needed
+	err = operations.LoadIfNeeded()
+
+	// Handle any error that occured when trying to load the datastore
+	if err != nil {
+		// Unlock reader lock
+		operations.RUnlock()
+
+		switch err.(type) {
+		// If the error was a "file not found error", end with a 404 Not Found status code
+		case *os.PathError:
+			endRequestWithError(w, r, http.StatusNotFound, nil)
+			return nil
+		}
+
+		// Otherwise, the error would be reported as an internal server error
+		return
+	}
+
+	// Unlock reader lock
+	operations.RUnlock()
 
 	// Create a WebSocket upgrader object
 	var websocketUpgrader = websocket.Upgrader{

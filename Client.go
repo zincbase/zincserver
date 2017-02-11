@@ -30,7 +30,12 @@ type PutPostResponse struct {
 
 // Sends a GET request to the server with the given 'updatedAfter' minimum timestamp
 func (this *Client) Get(updatedAfter int64) (results []Entry, err error) {
-	_, responseBody, err := this.Request("GET", map[string]string{"updatedAfter": fmt.Sprintf("%d", updatedAfter)}, nil)
+	params := map[string]string{}
+
+	if updatedAfter > 0 {
+		params["updatedAfter"] = fmt.Sprintf("%d", updatedAfter)
+	}
+	_, responseBody, err := this.Request("GET", params , nil)
 	if err != nil {
 		return
 	}
@@ -42,7 +47,12 @@ func (this *Client) Get(updatedAfter int64) (results []Entry, err error) {
 
 // Sends a GET request to the server with the given 'updatedAfter' minimum timestamp, and compacts the results
 func (this *Client) GetAndCompact(updatedAfter int64) (results []Entry, err error) {
-	_, responseBody, err := this.Request("GET", map[string]string{"updatedAfter": fmt.Sprintf("%d", updatedAfter)}, nil)
+	params := map[string]string{}
+
+	if updatedAfter > 0 {
+		params["updatedAfter"] = fmt.Sprintf("%d", updatedAfter)
+	}
+	_, responseBody, err := this.Request("GET", params , nil)
 	if err != nil {
 		return
 	}

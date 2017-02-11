@@ -1,10 +1,11 @@
 package main
 
 import (
+	"encoding/hex"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"encoding/hex"
 	"net/http"
+	"time"
 )
 
 var _ = Describe("Server", func() {
@@ -29,7 +30,7 @@ var _ = Describe("Server", func() {
 
 	const host = "http://localhost:12345"
 
-	setGlobalSetting := func(key string, value string, accessKey string) (err error) {
+	putGlobalSetting := func(key string, value string, accessKey string) (err error) {
 		globalConfigClient := NewClient(host, ".config", accessKey)
 
 		_, err = globalConfigClient.Post([]Entry{
@@ -44,7 +45,7 @@ var _ = Describe("Server", func() {
 		return
 	}
 
-	setDatastoreSetting := func(datastoreName string, key string, value string, accessKey string) (err error) {
+	putDatastoreSetting := func(datastoreName string, key string, value string, accessKey string) (err error) {
 		datastoreConfigClient := NewClient(host, datastoreName+".config", accessKey)
 
 		_, err = datastoreConfigClient.PostOrPut([]Entry{
@@ -262,7 +263,7 @@ var _ = Describe("Server", func() {
 	})
 
 	It("Executes a series of random operations and matches their results to a simulated datastore state (compaction disabled)", func() {
-		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "false", "")
+		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "false", "")
 		Expect(settingErr).To(BeNil())
 
 		const maxEntryCount = 10
@@ -332,10 +333,10 @@ var _ = Describe("Server", func() {
 	})
 
 	It("Executes a series of random operations and matches their results to a simulated datastore state (compaction enabled)", func() {
-		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "true", "")
+		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['enabled']"`, "true", "")
 		Expect(settingErr).To(BeNil())
 
-		settingErr = setDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['minUnusedSizeRatio']"`, "0.1", "")
+		settingErr = putDatastoreSetting(client.datastoreName, `"['datastore']['compaction']['minUnusedSizeRatio']"`, "0.1", "")
 		Expect(settingErr).To(BeNil())
 
 		const maxEntryCount = 10
@@ -444,7 +445,8 @@ var _ = Describe("Server", func() {
 		// Generate master key
 		masterKey := hex.EncodeToString(RandomBytes(16))
 		masterKeyHash := SHA1ToHex([]byte(masterKey))
-		setGlobalSetting(`"['server']['masterKeyHash']"`, `"`+masterKeyHash+`"`, "")
+		putGlobalSetting(`"['server']['masterKeyHash']"`, `"`+masterKeyHash+`"`, "")
+		defer putGlobalSetting(`"['server']['masterKeyHash']"`, `""`, masterKey)
 
 		// Test client with valid access key
 		clientWithValidAccessKey := NewClient(host, client.datastoreName, masterKey)
@@ -471,7 +473,7 @@ var _ = Describe("Server", func() {
 		// Generate access key
 		accessKey := hex.EncodeToString(RandomBytes(16))
 		accessKeyHash := SHA1ToHex([]byte(accessKey))
-		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"ReaderWriter"`, "")
+		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"ReaderWriter"`, "")
 		Expect(settingErr).To(BeNil())
 
 		// Test client with valid access key
@@ -499,7 +501,7 @@ var _ = Describe("Server", func() {
 		// Generate access key
 		accessKey := hex.EncodeToString(RandomBytes(16))
 		accessKeyHash := SHA1ToHex([]byte(accessKey))
-		settingErr := setDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"Reader"`, "")
+		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"Reader"`, "")
 		Expect(settingErr).To(BeNil())
 
 		// Put initial data in the datastore
@@ -512,6 +514,59 @@ var _ = Describe("Server", func() {
 		_, err = clientWithValidAccessKey.Post(testEntries)
 		Expect(err).NotTo(BeNil())
 		_, err = clientWithValidAccessKey.Get(0)
+		Expect(err).To(BeNil())
+	})
+
+	It("Rejects requests with parameters that are not allowed by the profile", func() {
+		// Generate access key
+		accessKey := hex.EncodeToString(RandomBytes(16))
+		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"Reader"`, "")
+		Expect(settingErr).To(BeNil())
+		settingErr = putDatastoreSetting(client.datastoreName, `"['accessProfile']['Reader']['method']['GET']['param']['updatedAfter']['allowed']"`, `false`, "")
+		Expect(settingErr).To(BeNil())
+
+		// Put initial data in the datastore
+		client.Put(testEntries)
+
+		// Test client
+		clientForProfile := NewClient(host, client.datastoreName, accessKey)
+
+		_, err := clientForProfile.Get(0)
+		Expect(err).To(BeNil())
+		_, err = clientForProfile.Get(1)
+		Expect(err).NotTo(BeNil())
+	})
+
+	It("Enforces rate limits for a particular profile", func() {
+		// Generate access key
+		accessKey := hex.EncodeToString(RandomBytes(16))
+		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"Reader"`, "")
+		Expect(settingErr).To(BeNil())
+		settingErr = putDatastoreSetting(client.datastoreName, `"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"`, `50`, "")
+		Expect(settingErr).To(BeNil())
+		settingErr = putDatastoreSetting(client.datastoreName, `"['accessProfile']['Reader']['method']['GET']['limit']['requests']['count']"`, `2`, "")
+		Expect(settingErr).To(BeNil())
+
+
+		// Put initial data in the datastore
+		client.Put(testEntries)
+
+		// Test client
+		clientForProfile := NewClient(host, client.datastoreName, accessKey)
+
+		_, err := clientForProfile.Get(0)
+		Expect(err).To(BeNil())
+
+		_, err = clientForProfile.Get(0)
+		Expect(err).To(BeNil())
+
+		_, err = clientForProfile.Get(0)
+		Expect(err).NotTo(BeNil())
+		time.Sleep(50 * time.Millisecond)
+
+		_, err = clientForProfile.Get(0)
 		Expect(err).To(BeNil())
 	})
 })

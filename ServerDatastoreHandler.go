@@ -142,8 +142,8 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	// Check authorization and rate limits
 	if accessKeyHash != masterKeyHash {
-		if datastoreName == ".config" {
-			endRequestWithError(w, r, http.StatusForbidden, errors.New("The configuration datastore can only be accessed through the master key."))
+		if operations.IsConfig() {
+			endRequestWithError(w, r, http.StatusForbidden, errors.New("A configuration datastore can only be accessed through the master key."))
 			return
 		}
 
@@ -582,7 +582,7 @@ func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *h
 func (this *ServerDatastoreHandler) handleDeleteRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
 	// If the target datastore is the global configuration datastore, reject the request
 	// with a "method not allowed" status
-	if operations.name == ".config" {
+	if operations.IsGlobalConfig() {
 		endRequestWithError(w, r, http.StatusMethodNotAllowed, errors.New("The global configuration datastore cannot be deleted."))
 		return
 	}

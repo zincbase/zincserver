@@ -2,10 +2,11 @@ package main
 
 import (
 	"encoding/hex"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"net/http"
 	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Server", func() {
@@ -408,9 +409,47 @@ var _ = Describe("Server", func() {
 		}
 	})
 
+	It("Servers a GET request with waitUntilNonempty enabled", func() {
+		_, putErr := client.Put([]Entry{})
+		Expect(putErr).To(BeNil())
+
+		initialEntries, getErr := client.Get(0)
+		Expect(getErr).To(BeNil())
+		Expect(initialEntries).NotTo(BeNil())
+		Expect(len(initialEntries)).To(Equal(1))
+
+		var result []Entry
+		var err error
+
+		go func() {
+			result, err = client.GetWhenNonEmpty(initialEntries[0].PrimaryHeader.CommitTime)
+		}()
+
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			_, postErr := client.Post(testEntries)
+			Expect(postErr).To(BeNil())
+		}()
+
+		Eventually(func() []Entry { return result }).Should(HaveLen(len(testEntries)))
+		ExpectEntryArraysToBeEquivalent(result, testEntries)
+	})
+
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
 	/// Operation error tests
 	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	It("Rejects requests to invalid datastore names", func() {
+		invalidClient := NewClient(host, "", "")
+		_, err := invalidClient.Get(0)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+
+		invalidClient = NewClient(host, RandomWordString(129), "")
+		_, err = invalidClient.Get(0)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+	})
+
 	It("Rejects GET requests to non-existing datastores", func() {
 		_, err := client.Get(0)
 		Expect(err).NotTo(BeNil())
@@ -472,7 +511,6 @@ var _ = Describe("Server", func() {
 		Expect(len(invalidAccessKey)).To(Equal(32))
 
 		invalidKeyClient := NewClient(host, datastoreName, invalidAccessKey)
-
 
 		_, err := invalidKeyClient.Get(0)
 		Expect(err).NotTo(BeNil())
@@ -569,7 +607,7 @@ var _ = Describe("Server", func() {
 		Expect(err.Error()).To(ContainSubstring("401"))
 
 		// And with a specific configuration datastore
-		datastoreConfigClient := NewClient(host, datastoreName + ".config", accessKey)
+		datastoreConfigClient := NewClient(host, datastoreName+".config", accessKey)
 		_, err = datastoreConfigClient.Get(0)
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("401"))
@@ -629,11 +667,10 @@ var _ = Describe("Server", func() {
 		accessKeyHash := SHA1ToHex([]byte(accessKey))
 		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"Reader"`, "")
 		Expect(settingErr).To(BeNil())
-		settingErr = putDatastoreSetting(client.datastoreName, `"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"`, `50`, "")
+		settingErr = putDatastoreSetting(client.datastoreName, `"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"`, `100`, "")
 		Expect(settingErr).To(BeNil())
 		settingErr = putDatastoreSetting(client.datastoreName, `"['accessProfile']['Reader']['method']['GET']['limit']['requests']['count']"`, `2`, "")
 		Expect(settingErr).To(BeNil())
-
 
 		// Put initial data in the datastore
 		client.Put(testEntries)
@@ -651,7 +688,7 @@ var _ = Describe("Server", func() {
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("429"))
 
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		_, err = clientForProfile.Get(0)
 		Expect(err).To(BeNil())

@@ -45,6 +45,23 @@ func (this *Client) Get(updatedAfter int64) (results []Entry, err error) {
 	return
 }
 
+// Sends a GET request to the server with the given 'updatedAfter' minimum timestamp
+func (this *Client) GetWhenNonEmpty(updatedAfter int64) (results []Entry, err error) {
+	params := map[string]string{
+		"updatedAfter": fmt.Sprintf("%d", updatedAfter),
+		"waitUntilNonempty": "true",
+	}
+
+	_, responseBody, err := this.Request("GET", params , nil)
+	if err != nil {
+		return
+	}
+
+	results, err = DeserializeEntryStreamBytes(responseBody)
+
+	return
+}
+
 // Sends a GET request to the server with the given 'updatedAfter' minimum timestamp, and compacts the results
 func (this *Client) GetAndCompact(updatedAfter int64) (results []Entry, err error) {
 	params := map[string]string{}

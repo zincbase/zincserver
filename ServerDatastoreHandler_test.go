@@ -810,7 +810,7 @@ var _ = Describe("Server", func() {
 	})
 
 	It("Enforces maximum datastore size limits", func() {
-		// Generate access key
+		// Set a maximum datastore size
 		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['limit']['maxSize']"`, `3000`, "")
 		Expect(settingErr).To(BeNil())
 
@@ -828,11 +828,41 @@ var _ = Describe("Server", func() {
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("403"))
 
-		// Generate access key
+		// Set a larger maximum datastore size
 		settingErr = putDatastoreSetting(client.datastoreName, `"['datastore']['limit']['maxSize']"`, `4000`, "")
 		Expect(settingErr).To(BeNil())
 
 		_, err = client.Post([]Entry{*getRandomBinaryEntry(20, 1000)})
+		Expect(err).To(BeNil())
+	})
+
+	It("Enforces maximum entry size limits", func() {
+		// Set a maximum entry size for this datastore
+		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['limit']['maxEntrySize']"`, `1000`, "")
+		Expect(settingErr).To(BeNil())
+
+		_, err := client.Put([]Entry{*getRandomBinaryEntry(20, 500)})
+		Expect(err).To(BeNil())
+
+		_, err = client.Post([]Entry{*getRandomBinaryEntry(20, 500)})
+		Expect(err).To(BeNil())
+
+		_, err = client.Put([]Entry{*getRandomBinaryEntry(20, 1500)})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("403"))
+
+		_, err = client.Post([]Entry{*getRandomBinaryEntry(20, 1500)})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("403"))
+
+		// Set a larger maximum entry size for this datastore
+		settingErr = putDatastoreSetting(client.datastoreName, `"['datastore']['limit']['maxEntrySize']"`, `2000`, "")
+		Expect(settingErr).To(BeNil())
+
+		_, err = client.Post([]Entry{*getRandomBinaryEntry(20, 1500)})
+		Expect(err).To(BeNil())
+
+		_, err = client.Put([]Entry{*getRandomBinaryEntry(20, 1500)})
 		Expect(err).To(BeNil())
 	})
 })

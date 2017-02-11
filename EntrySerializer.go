@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"fmt"
 )
 
 const PrimaryHeaderSize = 40
@@ -271,7 +272,7 @@ func VerifyPayloadChecksum(serializedHeader []byte, payloadReader io.Reader) err
 	return nil
 }
 
-func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64) error {
+func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64, maxEntrySize int64) error {
 	// Initialize the minimal allowed timestamp to 01/01/2017
 	const minAllowedTimestamp int64 = 1483221600 * 1000000
 	// Set the maximal allowed timestamp to current time + 30 seconds
@@ -300,6 +301,11 @@ func ValidateAndPrepareTransaction(entryStream []byte, newCommitTimestamp int64)
 		// Ensure the key size isn't zero
 		if iteratorResult.KeySize() == 0 {
 			return ErrEntryRejected{"Encountered an entry with a zero length key, which is not permitted in transaction entries."}
+		}
+
+		// Ensure the entry size isn't greater than the maximum allowed
+		if maxEntrySize > 0 && iteratorResult.Size > maxEntrySize {
+			return ErrDatastoreEntrySizeLimitExceeded{fmt.Sprintf("Encountered an entry with a size of %d, which is greater than the maximum allowed (%d).", iteratorResult.Size, maxEntrySize)}
 		}
 
 		// Ensure the primary header doesn't contain any other flag than 'TransactionEnd'

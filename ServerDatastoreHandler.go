@@ -531,7 +531,7 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 				err = nil
 
 			// Check for datastore too large errors and respond with a forbidden request status
-			case ErrDatastoreSizeLimitExceeded:
+			case ErrDatastoreSizeLimitExceeded, ErrDatastoreEntrySizeLimitExceeded:
 				endRequestWithError(w, r, http.StatusForbidden, err)
 				err = nil
 			}
@@ -581,7 +581,7 @@ func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *h
 				err = nil
 
 			// Check for datastore too large errors and respond with a forbidden request status
-			case ErrDatastoreSizeLimitExceeded:
+			case ErrDatastoreSizeLimitExceeded, ErrDatastoreEntrySizeLimitExceeded:
 				endRequestWithError(w, r, http.StatusForbidden, err)
 				err = nil
 			}

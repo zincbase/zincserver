@@ -22,6 +22,15 @@ func (this ErrEntryRejected) Error() string {
 	return this.message
 }
 
+type ErrDatastoreEntrySizeLimitExceeded struct {
+	message string
+}
+
+func (this ErrDatastoreEntrySizeLimitExceeded) Error() string {
+	return this.message
+}
+
 var ErrCorruptedEntry = errors.New("Invalid entry checksum detected. This may be due to data corruption.")
 var ErrInvalidHeadEntry = errors.New("Invalid head entry detected.")
 var ErrEmptyTransaction = errors.New("An empty transaction bytestream was given.")
+

@@ -311,12 +311,15 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 		return 0, ErrDatastoreSizeLimitExceeded{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
 
+	// Get the datastore size limit
+	entrySizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxEntrySize']")
+
 	// Get commit timestamp
 	commitTimestamp = this.GetColisionFreeTimestamp()
 
 	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
 	// for last entry
-	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp)
+	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp, entrySizeLimit)
 	if err != nil {
 		return
 	}
@@ -392,16 +395,19 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 		return 0, ErrDatastoreSizeLimitExceeded{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", this.name, datastoreSizeLimit)}
 	}
 
+	// Get the datastore's entry size limit
+	entrySizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxEntrySize']")
+
 	// Get a safe commit timestamp (must be strictly greater than a previous commit timestamp)
 	commitTimestamp = this.GetColisionFreeTimestamp()
 
 	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
 	// for last entry
-	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp)
+	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp, entrySizeLimit)
 
-	// If an error occured when validating the transaction
+	// If an error occured while validating the transaction
 	if err != nil {
-		// Return it
+		// Return the error
 		return
 	}
 

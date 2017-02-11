@@ -8,7 +8,7 @@ func GenerateRandomDatastore(filePath string, entryCount int, keySize int, value
 	creationTimestamp := MonoUnixTimeMicro()
 
 	entryStreamBuffer := GenerateRandomEntryStreamBytes(entryCount, keySize, valueSize, entryType)
-	ValidateAndPrepareTransaction(entryStreamBuffer, -1)
+	ValidateAndPrepareTransaction(entryStreamBuffer, -1, -1)
 
 	err = CreateOrRewriteFileSafe(filePath, CreateNewDatastoreReaderFromBytes(entryStreamBuffer, creationTimestamp))
 	if err != nil {

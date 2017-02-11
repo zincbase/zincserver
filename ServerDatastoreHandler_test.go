@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"time"
 
+	"bytes"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/gorilla/websocket"
 )
 
 var _ = Describe("Server", func() {
@@ -553,6 +556,29 @@ var _ = Describe("Server", func() {
 		Expect(err.Error()).To(ContainSubstring("400"))
 	})
 
+	It("Rejects invalid PUT entry streams", func() {
+		for length := 1; length < 50; length++ {
+			for i := 0; i < 10; i++ {
+				_, _, err := client.Request("PUT", nil, bytes.NewReader(RandomBytes(length)))
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("400"))
+			}
+		}
+	})
+
+	It("Rejects invalid POST entry streams", func() {
+		_, err := client.Put([]Entry{})
+		Expect(err).To(BeNil())
+
+		for length := 1; length < 50; length++ {
+			for i := 0; i < 10; i++ {
+				_, _, err := client.Request("POST", nil, bytes.NewReader(RandomBytes(i)))
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("400"))
+			}
+		}
+	})
+
 	It("Rejects DELETE requests to the global configuaration datastore", func() {
 		globalConfigClient := NewClient(host, ".config", "")
 		err := globalConfigClient.Delete()
@@ -577,6 +603,33 @@ var _ = Describe("Server", func() {
 		_, err := invalidKeyClient.Get(0)
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("400"))
+	})
+
+	It("Terminates a websocket if it attempts to send a binary or text message to the server", func() {
+		_, err := client.Put([]Entry{})
+		Expect(err).To(BeNil())
+
+		requestURL := "ws://" + client.BuildRequestURL(nil)[7:]
+		dialer := &websocket.Dialer{}
+		conn, _, err := dialer.Dial(requestURL, nil)
+		Expect(err).To(BeNil())
+
+		_, reader, err := conn.NextReader()
+		Expect(err).To(BeNil())
+		ReadEntireStream(reader)
+
+		var websocketReaderErr error
+		go func() {
+			_, _, websocketReaderErr = conn.NextReader()
+		}()
+
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+
+		}()
+		conn.WriteMessage(websocket.BinaryMessage, RandomBytes(1))
+
+		Eventually(func() error { return websocketReaderErr }).ShouldNot(BeNil())
 	})
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////

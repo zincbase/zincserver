@@ -143,7 +143,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	// Check authorization and rate limits
 	if accessKeyHash != masterKeyHash {
 		if operations.IsConfig() {
-			endRequestWithError(w, r, http.StatusForbidden, errors.New("A configuration datastore can only be accessed through the master key."))
+			endRequestWithError(w, r, http.StatusUnauthorized, errors.New("A configuration datastore can only be accessed through the master key."))
 			return
 		}
 
@@ -152,7 +152,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 		if err != nil {
 			// If a configuration entry wasn't found for the given key, end with an error
-			endRequestWithError(w, r, http.StatusForbidden, errors.New("Invalid access key."))
+			endRequestWithError(w, r, http.StatusUnauthorized, errors.New("Invalid access key."))
 			return
 		}
 
@@ -267,7 +267,7 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 	// Get the time that datastore was last modified
 	lastModifiedTime := operations.LastModifiedTime()
 
-	// If 'waitUntilNonempty' parameter was requested, and the updat time threshold is larger than
+	// If 'waitUntilNonempty' parameter was requested, and the update time threshold is larger than
 	// the last modified time, wait until matching data is available and only then return it
 	if query.Get("waitUntilNonempty") == "true" && updatedAfter >= lastModifiedTime {
 		updateChannel := operations.updateNotifier.CreateUpdateNotificationChannel(updatedAfter)

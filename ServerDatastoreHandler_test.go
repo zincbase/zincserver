@@ -94,6 +94,9 @@ var _ = Describe("Server", func() {
 		UnlinkFileSafe(config.StoragePath + ".config")
 	})
 
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// Operation tests
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
 	It("Puts and gets entries", func() {
 		commitTimestamp, err := client.Put(testEntries[0:2])
 
@@ -405,32 +408,39 @@ var _ = Describe("Server", func() {
 		}
 	})
 
-	It("Errors on GET requests to non-existing datastores", func() {
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// Operation error tests
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	It("Rejects GET requests to non-existing datastores", func() {
 		_, err := client.Get(0)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("404"))
 	})
 
-	It("Errors on POST requests to non-existing datastores", func() {
+	It("Rejects POST requests to non-existing datastores", func() {
 		_, err := client.Post(testEntries)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("404"))
 	})
 
-	It("Errors on POST requests with empty transactions", func() {
+	It("Rejects POST requests with empty transactions", func() {
 		_, err := client.Put([]Entry{})
 		Expect(err).To(BeNil())
 		_, err = client.Post([]Entry{})
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
 	})
 
-	It("Errors on PUT transactions including entries with 0-length keys", func() {
+	It("Rejects PUT transactions including entries with 0-length keys", func() {
 		_, err := client.Put([]Entry{
 			Entry{nil, []byte{}, []byte{}, []byte{1, 2, 3}},
 		})
 
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
 	})
 
-	It("Errors on POST transactions including entries with 0-length keys", func() {
+	It("Rejects POST transactions including entries with 0-length keys", func() {
 		_, err := client.Put([]Entry{})
 		Expect(err).To(BeNil())
 
@@ -439,8 +449,39 @@ var _ = Describe("Server", func() {
 		})
 
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
 	})
 
+	It("Rejects DELETE requests to the global configuaration datastore", func() {
+		globalConfigClient := NewClient(host, ".config", "")
+		err := globalConfigClient.Delete()
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("405"))
+	})
+
+	It("Rejects access keys with invalid lengths", func() {
+		invalidKeyClient := NewClient(host, datastoreName, "abcd")
+		_, err := invalidKeyClient.Get(0)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+	})
+
+	It("Rejects access keys with invalid characters", func() {
+		invalidAccessKey := hex.EncodeToString(RandomBytes(16))
+		invalidAccessKey = invalidAccessKey[:5] + string('X') + invalidAccessKey[6:]
+		Expect(len(invalidAccessKey)).To(Equal(32))
+
+		invalidKeyClient := NewClient(host, datastoreName, invalidAccessKey)
+
+
+		_, err := invalidKeyClient.Get(0)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+	})
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// Server configuration tests
+	//////////////////////////////////////////////////////////////////////////////////////////////////////
 	It("Rejects requests with invalid master keys", func() {
 		// Generate master key
 		masterKey := hex.EncodeToString(RandomBytes(16))
@@ -463,10 +504,15 @@ var _ = Describe("Server", func() {
 
 		_, err = clientWithInvalidAccessKey.Put(testEntries)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("401"))
+
 		_, err = clientWithInvalidAccessKey.Post(testEntries)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("401"))
+
 		_, err = clientWithInvalidAccessKey.Get(0)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("401"))
 	})
 
 	It("Rejects requests with invalid datastore access keys", func() {
@@ -491,10 +537,42 @@ var _ = Describe("Server", func() {
 
 		_, err = clientWithInvalidAccessKey.Put(testEntries)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("401"))
+
 		_, err = clientWithInvalidAccessKey.Post(testEntries)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("401"))
+
 		_, err = clientWithInvalidAccessKey.Get(0)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("401"))
+	})
+
+	It("Rejects requests to a configuaration datastore, not using the master key", func() {
+		// Generate access key
+		accessKey := hex.EncodeToString(RandomBytes(16))
+		accessKeyHash := SHA1ToHex([]byte(accessKey))
+
+		// Allow it to access to all datastores
+		settingErr := putGlobalSetting(`"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"ReaderWriter"`, "")
+		Expect(settingErr).To(BeNil())
+
+		// Try the access key with a target datastore, to verify it works
+		clientWithValidAccessKey := NewClient(host, client.datastoreName, accessKey)
+		_, err := clientWithValidAccessKey.Put(testEntries)
+		Expect(err).To(BeNil())
+
+		// Now try that access key with the global configuration datastore
+		globalConfigClient := NewClient(host, ".config", accessKey)
+		_, err = globalConfigClient.Get(0)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("401"))
+
+		// And with a specific configuration datastore
+		datastoreConfigClient := NewClient(host, datastoreName + ".config", accessKey)
+		_, err = datastoreConfigClient.Get(0)
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("401"))
 	})
 
 	It("Rejects requests methods that are not allowed by the profile", func() {
@@ -509,12 +587,18 @@ var _ = Describe("Server", func() {
 
 		// Test client with valid access key
 		clientWithValidAccessKey := NewClient(host, client.datastoreName, accessKey)
-		_, err := clientWithValidAccessKey.Put(testEntries)
+
+		_, err := clientWithValidAccessKey.Get(0)
+		Expect(err).To(BeNil())
+
+		_, err = clientWithValidAccessKey.Put(testEntries)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("403"))
+
 		_, err = clientWithValidAccessKey.Post(testEntries)
 		Expect(err).NotTo(BeNil())
-		_, err = clientWithValidAccessKey.Get(0)
-		Expect(err).To(BeNil())
+		Expect(err.Error()).To(ContainSubstring("403"))
+
 	})
 
 	It("Rejects requests with parameters that are not allowed by the profile", func() {
@@ -536,6 +620,7 @@ var _ = Describe("Server", func() {
 		Expect(err).To(BeNil())
 		_, err = clientForProfile.Get(1)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("403"))
 	})
 
 	It("Enforces rate limits for a particular profile", func() {
@@ -564,6 +649,8 @@ var _ = Describe("Server", func() {
 
 		_, err = clientForProfile.Get(0)
 		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("429"))
+
 		time.Sleep(50 * time.Millisecond)
 
 		_, err = clientForProfile.Get(0)

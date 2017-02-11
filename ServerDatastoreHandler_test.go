@@ -409,20 +409,15 @@ var _ = Describe("Server", func() {
 		}
 	})
 
-	It("Servers a GET request with waitUntilNonempty enabled", func() {
-		_, putErr := client.Put([]Entry{})
+	It("Serves a GET request with waitUntilNonempty enabled", func() {
+		commitTimestamp, putErr := client.Put([]Entry{})
 		Expect(putErr).To(BeNil())
-
-		initialEntries, getErr := client.Get(0)
-		Expect(getErr).To(BeNil())
-		Expect(initialEntries).NotTo(BeNil())
-		Expect(len(initialEntries)).To(Equal(1))
 
 		var result []Entry
 		var err error
 
 		go func() {
-			result, err = client.GetWhenNonEmpty(initialEntries[0].PrimaryHeader.CommitTime)
+			result, err = client.GetWhenNonEmpty(commitTimestamp)
 		}()
 
 		go func() {
@@ -433,6 +428,44 @@ var _ = Describe("Server", func() {
 
 		Eventually(func() []Entry { return result }).Should(HaveLen(len(testEntries)))
 		ExpectEntryArraysToBeEquivalent(result, testEntries)
+	})
+
+	It("Compacts the datastore if a certain threshold is reached", func() {
+		//
+		configErr := putDatastoreSetting(datastoreName, `"['datastore']['compaction']['enabled']"`, "true", "")
+		Expect(configErr).To(BeNil())
+		configErr = putDatastoreSetting(datastoreName, `"['datastore']['compaction']['minGrowthRatio']"`, "1", "")
+		Expect(configErr).To(BeNil())
+		configErr = putDatastoreSetting(datastoreName, `"['datastore']['compaction']['minSize']"`, "3000", "")
+		Expect(configErr).To(BeNil())
+		configErr = putDatastoreSetting(datastoreName, `"['datastore']['compaction']['minUnusedSizeRatio']"`, "0.3", "")
+		Expect(configErr).To(BeNil())
+
+		randomEntry := getRandomBinaryEntry(20, 1000)
+
+		// Put the entry and get the entire content
+		_, putErr := client.Put([]Entry{*randomEntry})
+		Expect(putErr).To(BeNil())
+
+		result, getErr := client.Get(0)
+		Expect(getErr).To(BeNil())
+		Expect(len(result)).To(Equal(2))
+
+		// Transmit the entry again and get the entire content
+		_, putErr = client.Post([]Entry{*randomEntry})
+		Expect(putErr).To(BeNil())
+
+		result, getErr = client.Get(0)
+		Expect(getErr).To(BeNil())
+		Expect(len(result)).To(Equal(3))
+
+		// Transmit the entry again and get the entire content
+		_, putErr = client.Post([]Entry{*randomEntry})
+		Expect(putErr).To(BeNil())
+
+		result, getErr = client.Get(0)
+		Expect(getErr).To(BeNil())
+		Expect(len(result)).To(Equal(2))
 	})
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////

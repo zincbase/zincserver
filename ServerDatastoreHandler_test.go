@@ -755,4 +755,31 @@ var _ = Describe("Server", func() {
 		_, err = clientForProfile.Get(0)
 		Expect(err).To(BeNil())
 	})
+
+	It("Enforces maximum datastore size limits", func() {
+		// Generate access key
+		settingErr := putDatastoreSetting(client.datastoreName, `"['datastore']['limit']['maxSize']"`, `3000`, "")
+		Expect(settingErr).To(BeNil())
+
+		_, err := client.Put([]Entry{*getRandomBinaryEntry(20, 3000)})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("403"))
+
+		_, err = client.Put([]Entry{*getRandomBinaryEntry(20, 1000)})
+		Expect(err).To(BeNil())
+
+		_, err = client.Post([]Entry{*getRandomBinaryEntry(20, 1000)})
+		Expect(err).To(BeNil())
+
+		_, err = client.Post([]Entry{*getRandomBinaryEntry(20, 1000)})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("403"))
+
+		// Generate access key
+		settingErr = putDatastoreSetting(client.datastoreName, `"['datastore']['limit']['maxSize']"`, `4000`, "")
+		Expect(settingErr).To(BeNil())
+
+		_, err = client.Post([]Entry{*getRandomBinaryEntry(20, 1000)})
+		Expect(err).To(BeNil())
+	})
 })

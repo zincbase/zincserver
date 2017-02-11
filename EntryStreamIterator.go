@@ -201,14 +201,14 @@ func (this *EntryStreamIteratorResult) VerifyAllChecksums() (err error) {
 
 // Is this supposed to be a head entry?
 func (this *EntryStreamIteratorResult) IsHeadEntry() bool {
-	return this.KeySize() == 0
+	return this.PrimaryHeader.Flags & Flag_HeadEntry == Flag_HeadEntry
 }
 
 // Verify as valid head entry
 func (this *EntryStreamIteratorResult) VerifyValidHeadEntry() error {
-
-	if this.Size != HeadEntrySize ||
+	if !this.IsHeadEntry() ||
 		this.KeySize() != 0 ||
+		this.Size != HeadEntrySize ||
 		this.ValueSize() != HeadEntryValueSize {
 			return ErrInvalidHeadEntry
 	}

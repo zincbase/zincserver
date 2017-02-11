@@ -32,6 +32,7 @@ type EntryPrimaryHeader struct {
 
 const (
 	Flag_TransactionEnd uint8 = 1
+	Flag_HeadEntry uint8      = 2
 	DataFormat_Binary   uint8 = 0
 	DataFormat_UTF8     uint8 = 1
 	DataFormat_JSON     uint8 = 2

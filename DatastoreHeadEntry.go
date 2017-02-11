@@ -44,7 +44,11 @@ func CreateHeadEntry(value *HeadEntryValue, timestamp int64) *Entry {
 
 	// Return an entry with the timestamp and serialized value
 	return &Entry{
-		PrimaryHeader:        &EntryPrimaryHeader{UpdateTime: timestamp, CommitTime: timestamp, Flags: Flag_TransactionEnd},
+		PrimaryHeader:        &EntryPrimaryHeader{
+			UpdateTime: timestamp,
+			CommitTime: timestamp,
+			Flags: Flag_TransactionEnd | Flag_HeadEntry,
+		},
 		SecondaryHeaderBytes: []byte{},
 		Key:                  []byte{},
 		Value:                SerializeHeadEntryValue(value),

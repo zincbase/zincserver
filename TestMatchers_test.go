@@ -4,7 +4,6 @@ import (
 	. "github.com/onsi/gomega"
 	//. "github.com/onsi/gomega/gstruct"
 	. "github.com/onsi/gomega/types"
-	//"log"
 )
 
 func ExpectEntriesToBeEqual(entry1 Entry, entry2 Entry) {

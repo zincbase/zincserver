@@ -2,7 +2,6 @@ package main
 
 import (
 	"io"
-	//"log"
 )
 
 const MaxPrefetchSize = 32768
@@ -45,7 +44,7 @@ func (this *PrefetchingReaderAt) ReadAt(p []byte, readOffset int64) (int, error)
 		copy(p, this.prefetchBuffer[0:bytesRead])
 		return bytesRead, nil
 
-		
+
 	} else { // Otherwise just return the result of ReadAt
 		return this.readerAt.ReadAt(p, readOffset)
 	}

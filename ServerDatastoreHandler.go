@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	//"log"
 )
 
 // Declare the datastore handler object type

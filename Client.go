@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	//"log"
 	"strings"
+
+	"github.com/gorilla/websocket"
 )
 
 // The client object
@@ -35,7 +36,7 @@ func (this *Client) Get(updatedAfter int64) (results []Entry, err error) {
 	if updatedAfter > 0 {
 		params["updatedAfter"] = fmt.Sprintf("%d", updatedAfter)
 	}
-	_, responseBody, err := this.Request("GET", params , nil)
+	_, responseBody, err := this.Request("GET", params, nil)
 	if err != nil {
 		return
 	}
@@ -48,11 +49,11 @@ func (this *Client) Get(updatedAfter int64) (results []Entry, err error) {
 // Sends a GET request to the server with the given 'updatedAfter' minimum timestamp
 func (this *Client) GetWhenNonEmpty(updatedAfter int64) (results []Entry, err error) {
 	params := map[string]string{
-		"updatedAfter": fmt.Sprintf("%d", updatedAfter),
+		"updatedAfter":      fmt.Sprintf("%d", updatedAfter),
 		"waitUntilNonempty": "true",
 	}
 
-	_, responseBody, err := this.Request("GET", params , nil)
+	_, responseBody, err := this.Request("GET", params, nil)
 	if err != nil {
 		return
 	}
@@ -69,7 +70,7 @@ func (this *Client) GetAndCompact(updatedAfter int64) (results []Entry, err erro
 	if updatedAfter > 0 {
 		params["updatedAfter"] = fmt.Sprintf("%d", updatedAfter)
 	}
-	_, responseBody, err := this.Request("GET", params , nil)
+	_, responseBody, err := this.Request("GET", params, nil)
 	if err != nil {
 		return
 	}
@@ -155,26 +156,7 @@ func (this *Client) Delete() (err error) {
 
 // Sends an HTTP request to the datastore with the given method, arguments and body
 func (this *Client) Request(method string, queryArgs map[string]string, requestBody io.Reader) (response *http.Response, responseBody []byte, err error) {
-	queryComponents := []string{}
-
-	for k, v := range queryArgs {
-		if v != "" {
-			queryComponents = append(queryComponents, fmt.Sprintf("%s=%s", k, v))
-		}
-	}
-
-	if this.accessKey != "" {
-		queryComponents = append(queryComponents, fmt.Sprintf("accessKey=%s", this.accessKey))
-	}
-
-	queryString := "?" + strings.Join(queryComponents, "&")
-	var url string
-
-	if len(queryString) > 1 {
-		url = this.hostURL + "/datastore/" + this.datastoreName + queryString
-	} else {
-		url = this.hostURL + "/datastore/" + this.datastoreName
-	}
+	url := this.BuildRequestURL(queryArgs)
 
 	request, err := http.NewRequest(method, url, requestBody)
 
@@ -189,17 +171,73 @@ func (this *Client) Request(method string, queryArgs map[string]string, requestB
 		return
 	}
 
-	memoryWriter := NewMemoryWriter()
-	_, err = io.Copy(memoryWriter, response.Body)
+	responseBody, err = ReadEntireStream(response.Body)
 	if err != nil {
 		return
 	}
-
-	responseBody = memoryWriter.WrittenData()
 
 	if response.StatusCode != 200 {
 		return response, responseBody, errors.New("Response status: " + response.Status)
 	}
 
 	return
+}
+//type webSocketClientReadNextFunc func() ([]Entry, error)
+
+func (this *Client) OpenWebSocket(updatedAfter int64)  (func() ([]Entry, error), error) {
+	dialer := &websocket.Dialer{}
+	queryArgs := map[string]string{}
+
+	if updatedAfter > 0 {
+		queryArgs["updatedAfter"] = fmt.Sprintf("%d", updatedAfter)
+	}
+
+	requestURL := this.BuildRequestURL(queryArgs)
+	requestURL = "ws://" + requestURL[7:]
+	conn, _, err := dialer.Dial(requestURL, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return func() ([]Entry, error) {
+		for {
+			messageType, reader, err := conn.NextReader()
+			if err != nil {
+				return nil , err
+			}
+
+			if messageType == websocket.BinaryMessage {
+				entryStreamBytes, err := ReadEntireStream(reader)
+
+				if err != nil {
+					return nil , err
+				}
+
+				return DeserializeEntryStreamBytes(entryStreamBytes)
+			}
+		}
+	}, nil
+}
+
+func (this *Client) BuildRequestURL(queryArgs map[string]string) string {
+	queryComponents := []string{}
+
+	for k, v := range queryArgs {
+		if v != "" {
+			queryComponents = append(queryComponents, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+
+	if this.accessKey != "" {
+		queryComponents = append(queryComponents, fmt.Sprintf("accessKey=%s", this.accessKey))
+	}
+
+	queryString := "?" + strings.Join(queryComponents, "&")
+
+	if len(queryString) > 1 {
+		return this.hostURL + "/datastore/" + this.datastoreName + queryString
+	} else {
+		return this.hostURL + "/datastore/" + this.datastoreName
+	}
 }

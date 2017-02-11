@@ -88,20 +88,8 @@ func ReadEntireFile(filePath string) (fileContent []byte, err error) {
 	// Close the file once the function exists
 	defer file.Close()
 
-	// Create a new memory writer
-	memoryWriter := NewMemoryWriter()
-
 	// Read the entire file to memory
-	_, err = io.Copy(memoryWriter, file)
-
-	// If an error occurred while reading the file
-	if err != nil {
-		// Return the error
-		return
-	}
-
-	// Set the returned slice to the data read
-	fileContent = memoryWriter.WrittenData()
+	fileContent, err = ReadEntireStream(file)
 
 	return
 }

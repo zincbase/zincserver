@@ -140,20 +140,8 @@ func (this *DatastoreKeyIndex) CreateReaderForCompactedRanges(entryStream io.Rea
 
 // Compact the given entry stream to a buffer
 func (this *DatastoreKeyIndex) CompactToByteArray(entryStream io.ReaderAt, startOffset int64) (result []byte, err error) {
-	// Create a new memory writer
-	memoryWriter := NewMemoryWriter()
-
-	// Copy the result of the operation in the writer
-	_, err = io.Copy(memoryWriter, this.CreateReaderForCompactedRanges(entryStream, startOffset))
-
-	// If an error occurred when copying
-	if err != nil {
-		// Return the error
-		return
-	}
-
-	// Retrieve the resulting buffer from the writter
-	result = memoryWriter.WrittenData()
+	// Read the entire compacted ranges stream
+	result, err = ReadEntireStream(this.CreateReaderForCompactedRanges(entryStream, startOffset))
 
 	// Return the result
 	return

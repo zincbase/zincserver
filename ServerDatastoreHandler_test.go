@@ -276,7 +276,7 @@ var _ = Describe("Server", func() {
 
 		simulator := NewServerDatastoreHandlerSimulator()
 
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 10; i++ {
 			operationCode := RandomIntInRange(0, 100)
 
 			if operationCode < 7 { // PUT operation
@@ -349,7 +349,7 @@ var _ = Describe("Server", func() {
 
 		simulator := NewServerDatastoreHandlerSimulator()
 
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 10; i++ {
 			operationCode := RandomIntInRange(0, 100)
 
 			if operationCode < 7 { // PUT operation
@@ -428,6 +428,35 @@ var _ = Describe("Server", func() {
 
 		Eventually(func() []Entry { return result }).Should(HaveLen(len(testEntries)))
 		ExpectEntryArraysToBeEquivalent(result, testEntries)
+	})
+
+	It("Serves a WebSocket connection", func() {
+		_, putErr := client.Put(testEntries)
+		Expect(putErr).To(BeNil())
+
+		nextResult, err := client.OpenWebSocket(0)
+
+		Expect(err).To(BeNil())
+		result, err := nextResult()
+
+		Expect(err).To(BeNil())
+		ExpectEntryArraysToBeEquivalent(result[1:], testEntries)
+
+		randomEntries := []Entry{*getRandomBinaryEntry(20, 500), *getRandomBinaryEntry(20, 200)}
+
+		go func() {
+			result, err = nextResult()
+			Log("Result: ", result)
+		}()
+
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			_, postErr := client.Post(randomEntries)
+			Expect(postErr).To(BeNil())
+		}()
+
+		Eventually(func() []Entry { return result }).Should(HaveLen(len(randomEntries)))
+		ExpectEntryArraysToBeEquivalent(result, randomEntries)
 	})
 
 	It("Compacts the datastore if a certain threshold is reached", func() {

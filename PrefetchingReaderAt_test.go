@@ -7,7 +7,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	//"log"
 )
 
 var _ = Describe("PrefetchingReaderAt", func() {

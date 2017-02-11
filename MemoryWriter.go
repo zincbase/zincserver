@@ -1,6 +1,8 @@
 package main
 
-//"io"
+import (
+	"io"
+)
 
 type MemoryWriter struct {
 	result []byte
@@ -9,6 +11,10 @@ type MemoryWriter struct {
 func (this *MemoryWriter) Write(p []byte) (n int, err error) {
 	this.result = append(this.result, p...)
 	return len(p), nil
+}
+
+func (this *MemoryWriter) CopyFromReader(reader io.Reader) (n int64, err error) {
+	return io.Copy(this, reader)
 }
 
 func (this *MemoryWriter) WrittenData() []byte {

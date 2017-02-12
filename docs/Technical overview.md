@@ -19,7 +19,7 @@ A datastore file is internally structured like the following:
 
 When the server is started, it spawns an HTTP(S) server and becomes available for requests. It does not initially process or load any datastore (aside from its global configuration datastore).
 
-When a datastore is first referenced in a request, it is loaded (as well as its own configuration, if exists), and a minimal chronological index of its revisions is generated and stored in memory (or alternatively: a cached one is loaded from disk). This index is a very simple sorted list of the form:
+When a datastore is first referenced in a request, its file is opened, and its configuration, if exists, is loaded to memory. A minimal chronological index of its revisions is generated and stored in memory (or alternatively: a cached one is loaded from disk). This index is a very simple sorted list of the form:
 ```
 (timestamp, offset), (timestamp, offset), (timestamp, offset), (timestamp, offset), ...
 ```

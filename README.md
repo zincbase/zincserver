@@ -6,7 +6,7 @@ ZincServer is a high-performance server back-end for [ZincDB](https://github.com
 
 ZincServer is an on-disk, transactional, networked persistence provider designed to efficiently perform a highly reduced set of operations needed for reliable data storage and synchronization.
 
-In some aspects it resembles a [message broker](https://en.wikipedia.org/wiki/Message_broker). However, it models the data as key-value store (though doesn't actually allow to retrieve individual keys), and intended to provide assurance of data integrity and long-term availability. Its security and customization features also allow it to be fully open to the global internet, and accessed directly from browsers, desktop or mobile applications, reducing the need for a custom application servers.
+In some aspects it resembles a [message broker](https://en.wikipedia.org/wiki/Message_broker). However, it models the data as a ey-value store (though doesn't actually allow to retrieve individual keys), and intended to provide assurance of data integrity and long-term availability. Its security and customization features also allow it to be fully open to the global internet, and accessed directly from browsers, desktop or mobile applications, reducing the need for custom application servers.
 
 ## Status
 

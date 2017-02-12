@@ -49,6 +49,7 @@ var _ = Describe("Server error handling", func() {
 	It("Rejects POST requests to non-existing datastores", func() {
 		client := context.GetClientForRandomDatastore("")
 		testEntries := context.GetTestEntries()
+
 		_, err := client.Post(testEntries)
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("404"))
@@ -56,8 +57,10 @@ var _ = Describe("Server error handling", func() {
 
 	It("Rejects POST requests with empty transactions", func() {
 		client := context.GetClientForRandomDatastore("")
+
 		_, err := client.Put([]Entry{})
 		Expect(err).To(BeNil())
+
 		_, err = client.Post([]Entry{})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("400"))
@@ -65,6 +68,7 @@ var _ = Describe("Server error handling", func() {
 
 	It("Rejects PUT transactions including entries with 0-length keys", func() {
 		client := context.GetClientForRandomDatastore("")
+
 		_, err := client.Put([]Entry{
 			Entry{nil, []byte{}, []byte{}, []byte{1, 2, 3}},
 		})
@@ -141,6 +145,7 @@ var _ = Describe("Server error handling", func() {
 
 	It("Rejects invalid PUT entry streams", func() {
 		client := context.GetClientForRandomDatastore("")
+
 		for length := 1; length < 50; length++ {
 			for i := 0; i < 10; i++ {
 				_, _, err := client.Request("PUT", nil, bytes.NewReader(RandomBytes(length)))
@@ -152,6 +157,7 @@ var _ = Describe("Server error handling", func() {
 
 	It("Rejects invalid POST entry streams", func() {
 		client := context.GetClientForRandomDatastore("")
+
 		_, err := client.Put([]Entry{})
 		Expect(err).To(BeNil())
 
@@ -166,6 +172,7 @@ var _ = Describe("Server error handling", func() {
 
 	It("Rejects DELETE requests to the global configuaration datastore", func() {
 		globalConfigClient := NewClient(context.hostURL, ".config", "")
+
 		err := globalConfigClient.Delete()
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("405"))
@@ -173,6 +180,7 @@ var _ = Describe("Server error handling", func() {
 
 	It("Rejects access keys with invalid lengths", func() {
 		invalidKeyClient := NewClient(context.hostURL, RandomWordString(12), "abcd")
+
 		_, err := invalidKeyClient.Get(0)
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("400"))
@@ -181,6 +189,7 @@ var _ = Describe("Server error handling", func() {
 	It("Rejects access keys with invalid characters", func() {
 		invalidAccessKey := hex.EncodeToString(RandomBytes(16))
 		invalidAccessKey = invalidAccessKey[:5] + string('X') + invalidAccessKey[6:]
+		
 		Expect(len(invalidAccessKey)).To(Equal(32))
 
 		invalidKeyClient := NewClient(context.hostURL, RandomWordString(12), invalidAccessKey)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"encoding/hex"
 )
 
 type ServerTestContext struct {
@@ -60,6 +61,13 @@ func (this *ServerTestContext) GetGlobalConfigClient(accessKey string) *Client {
 
 func (this *ServerTestContext) GetRandomEntries(maxCount int, maxKeySize int, maxValueSize int) []Entry {
 	return GenerateRandomEntries(RandomIntInRange(1, maxCount), maxKeySize, maxValueSize, "randomBinaryEntry")
+}
+
+func (this *ServerTestContext) GetRandomAccessKey() (key string, keyHash string) {
+	key = hex.EncodeToString(RandomBytes(16))
+	keyHash = SHA1ToHex([]byte(key))
+
+	return
 }
 
 func (this *ServerTestContext) GetTestEntries() []Entry {

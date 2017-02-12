@@ -28,8 +28,9 @@ var _ = Describe("Server", func() {
 		testEntries := context.GetTestEntries()
 
 		// Generate master key
-		masterKey := hex.EncodeToString(RandomBytes(16))
-		masterKeyHash := SHA1ToHex([]byte(masterKey))
+		masterKey, masterKeyHash := context.GetRandomAccessKey()
+
+		// Set the generated key as the new master key
 		context.PutGlobalSetting(`"['server']['masterKeyHash']"`, `"`+masterKeyHash+`"`, "")
 		defer context.PutGlobalSetting(`"['server']['masterKeyHash']"`, `""`, masterKey)
 
@@ -64,8 +65,9 @@ var _ = Describe("Server", func() {
 		testEntries := context.GetTestEntries()
 
 		// Generate access key
-		accessKey := hex.EncodeToString(RandomBytes(16))
-		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		accessKey, accessKeyHash := context.GetRandomAccessKey()
+
+		// Set the generated access key as an access key for the datastore
 		settingErr := context.PutDatastoreSetting(datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"ReaderWriter"`, "")
 		Expect(settingErr).To(BeNil())
 
@@ -100,8 +102,7 @@ var _ = Describe("Server", func() {
 		testEntries := context.GetTestEntries()
 
 		// Generate access key
-		accessKey := hex.EncodeToString(RandomBytes(16))
-		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		accessKey, accessKeyHash := context.GetRandomAccessKey()
 
 		// Allow it to access to all datastores
 		settingErr := context.PutGlobalSetting(`"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"ReaderWriter"`, "")
@@ -130,8 +131,8 @@ var _ = Describe("Server", func() {
 		testEntries := context.GetTestEntries()
 
 		// Generate access key
-		accessKey := hex.EncodeToString(RandomBytes(16))
-		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		accessKey, accessKeyHash := context.GetRandomAccessKey()
+
 		settingErr := context.PutDatastoreSetting(client.datastoreName, `"['datastore']['accessKeyHash']['`+accessKeyHash+`']"`, `"Reader"`, "")
 		Expect(settingErr).To(BeNil())
 
@@ -159,8 +160,9 @@ var _ = Describe("Server", func() {
 		testEntries := context.GetTestEntries()
 
 		// Generate access key
-		accessKey := hex.EncodeToString(RandomBytes(16))
-		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		accessKey, accessKeyHash := context.GetRandomAccessKey()
+
+		// Set the generated key as an access key for the datastore
 		settingErr := context.PutDatastoreSettings(client.datastoreName, map[string]string{
 			`"['datastore']['accessKeyHash']['` + accessKeyHash + `']"`:                          `"Reader"`,
 			`"['accessProfile']['Reader']['method']['GET']['param']['updatedAfter']['allowed']"`: `false`,
@@ -185,9 +187,9 @@ var _ = Describe("Server", func() {
 		testEntries := context.GetTestEntries()
 
 		// Generate access key
-		accessKey := hex.EncodeToString(RandomBytes(16))
-		accessKeyHash := SHA1ToHex([]byte(accessKey))
+		accessKey, accessKeyHash := context.GetRandomAccessKey()
 
+		// Set config options
 		settingErr := context.PutDatastoreSettings(client.datastoreName, map[string]string{
 			`"['datastore']['accessKeyHash']['` + accessKeyHash + `']"`:                       `"Reader"`,
 			`"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"`: `50`,

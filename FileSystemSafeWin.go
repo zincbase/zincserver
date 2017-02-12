@@ -4,63 +4,49 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 )
 
-func CreateOrRewriteFileSafe(filePath string, newContentReader io.Reader) (err error) {
-	// Get timestamp
-	timestamp := MonoUnixTimeMicro()
+// Safely replaces a file with another file, if exists. On windows this can't be done
+// with a single Rename operation, even if the existing file is opened with delete sharing mode.
+func ReplaceFileSafe(sourceFilePath string, targetFilePath string) (err error) {
+	tempFileName := fmt.Sprintf("%s.old-%d", targetFilePath, MonoUnixTimeMicro())
 
-	// Initialize temporary file names
-	tempFileName := fmt.Sprintf("%s.partial-%d", filePath, timestamp)
-	oldFileName := fmt.Sprintf("%s.old-%d", filePath, timestamp)
+	// Check if the target file already exists
+	targetFileExisted, err := FileExists(targetFilePath)
 
-	// Write the new content to a temporary file
-	err = CreateOrRewriteFile(tempFileName, newContentReader, true)
-
-	// If an error occurred while creating or rewriting the file
+	// If an error occurred while checking for the existence of the file
 	if err != nil {
-		// Return the error
 		return
 	}
 
-	// Check if a file with the given path already exists.
-	fileExists, err := FileExists(filePath)
+	// If the target already exists
+	if targetFileExisted {
+		// Rename the existing file to a temporary name.
+		err = os.Rename(targetFilePath, tempFileName)
 
-	// If an error occurred while checking the existence of the file
-	if err != nil {
-		// Return the error
-		return
-	}
-
-	// If the file exists
-	if fileExists {
-		// Rename the existing file to the 'old' file
-		err = os.Rename(filePath, oldFileName)
-
-		// If an error occurred while renaming the existing file
+		// If an error occurred
 		if err != nil {
 			// Return the error
 			return
 		}
 	}
 
-	// Rename the temporary file into the target file
-	err = os.Rename(tempFileName, filePath)
+	// Rename the source file to the target file
+	err = os.Rename(sourceFilePath, targetFilePath)
 
-	// If an error occurred while renaming the temporary file
+	// If an error occurred while renaming the file
 	if err != nil {
 		// Return the error
 		return
 	}
 
-	// Unlink the old file, if existed
-	if fileExists {
-		// Unlink the old file
-		err = os.Remove(oldFileName)
+	// If the target file existed
+	if targetFileExisted {
+		// Unlink the temporary file
+		err = os.Remove(tempFileName)
 
-		// If an error occurred while unlinking the old file
+		// If an error occurred while deleting the file
 		if err != nil {
 			// Return the error
 			return
@@ -71,12 +57,16 @@ func CreateOrRewriteFileSafe(filePath string, newContentReader io.Reader) (err e
 }
 
 func UnlinkFileSafe(filePath string) (err error) {
+	// Initialize deleted file temporary file name
 	deletedFileName := fmt.Sprintf("%s.deleted-%d", filePath, MonoUnixTimeMicro())
+
+	// Rename the file to the temporary file name
 	err = os.Rename(filePath, deletedFileName)
 	if err != nil {
 		return
 	}
 
+	// Delete the file
 	err = os.Remove(deletedFileName)
 	if err != nil {
 		return

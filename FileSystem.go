@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"fmt"
 )
 
 func FileExists(filePath string) (bool, error) {
@@ -92,4 +93,22 @@ func ReadEntireFile(filePath string) (fileContent []byte, err error) {
 	fileContent, err = ReadEntireStream(file)
 
 	return
+}
+
+// Safely creates or rewrites a file
+func CreateOrRewriteFileSafe(filePath string, newContentReader io.Reader) (err error) {
+	// Initialize temporary file names
+	tempFileName := fmt.Sprintf("%s.partial-%d", filePath, MonoUnixTimeMicro())
+
+	// Write the new content to a temporary file, and flush it afterwards
+	err = CreateOrRewriteFile(tempFileName, newContentReader, true)
+
+	// If an error occurred while writing to the temporary file
+	if err != nil {
+		// Return the error
+		return
+	}
+
+	// Replace the target file with the temporary file
+	return ReplaceFileSafe(tempFileName, filePath)
 }

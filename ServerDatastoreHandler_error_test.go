@@ -75,6 +75,7 @@ var _ = Describe("Server error handling", func() {
 
 	It("Rejects POST transactions including entries with 0-length keys", func() {
 		client := context.GetClientForRandomDatastore("")
+
 		_, err := client.Put([]Entry{})
 		Expect(err).To(BeNil())
 
@@ -82,6 +83,58 @@ var _ = Describe("Server error handling", func() {
 			Entry{nil, []byte{}, []byte{}, []byte{1, 2, 3}},
 		})
 
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+	})
+
+	It("Rejects PUT and POST transactions including entries with invalid update timestamps", func() {
+		client := context.GetClientForRandomDatastore("")
+
+		var getEntryWithUpdateTime = func(updateTime int64) Entry {
+			return Entry{&EntryPrimaryHeader{UpdateTime: updateTime}, []byte{}, []byte("Hello"), []byte{1, 2, 3}}
+		}
+
+		_, err := client.Put([]Entry{})
+		Expect(err).To(BeNil())
+
+		// Try an entry containing current time as update time and verify that works
+		_, err = client.Put([]Entry{getEntryWithUpdateTime(MonoUnixTimeMicro())})
+		Expect(err).To(BeNil())
+
+		_, err = client.Post([]Entry{getEntryWithUpdateTime(MonoUnixTimeMicro())})
+		Expect(err).To(BeNil())
+
+		// Try an entry containing 1 as update time and verify it fails
+		_, err = client.Put([]Entry{getEntryWithUpdateTime(1)})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+
+		_, err = client.Post([]Entry{getEntryWithUpdateTime(1)})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+
+		// Try an entry containing currentTime + 2 minutes as update time and verify it fails
+		_, err = client.Put([]Entry{getEntryWithUpdateTime(MonoUnixTimeMicro() + (2 * 60 * 1000 * 1000))})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+
+		_, err = client.Post([]Entry{getEntryWithUpdateTime(MonoUnixTimeMicro() + (2 * 60 * 1000 * 1000))})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+
+		// Try an entry containing January 1 2017 00:00 (unix time 1483221600 * 1000000) as update time and verify it works
+		_, err = client.Put([]Entry{getEntryWithUpdateTime(1483221600 * 1000 * 1000)})
+		Expect(err).To(BeNil())
+
+		_, err = client.Post([]Entry{getEntryWithUpdateTime(1483221600 * 1000 * 1000)})
+		Expect(err).To(BeNil())
+
+		// Post an entry containing one second before Janurary 1 2017 00:00 as update time and verify it fails
+		_, err = client.Put([]Entry{getEntryWithUpdateTime((1483221600 - 1) * 1000 * 1000)})
+		Expect(err).NotTo(BeNil())
+		Expect(err.Error()).To(ContainSubstring("400"))
+
+		_, err = client.Post([]Entry{getEntryWithUpdateTime((1483221600 - 1) * 1000 * 1000)})
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring("400"))
 	})

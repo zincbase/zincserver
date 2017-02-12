@@ -190,7 +190,7 @@ var _ = Describe("Server", func() {
 
 		settingErr := context.PutDatastoreSettings(client.datastoreName, map[string]string{
 			`"['datastore']['accessKeyHash']['` + accessKeyHash + `']"`:                       `"Reader"`,
-			`"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"`: `100`,
+			`"['accessProfile']['Reader']['method']['GET']['limit']['requests']['interval']"`: `50`,
 			`"['accessProfile']['Reader']['method']['GET']['limit']['requests']['count']"`:    `2`,
 		}, "")
 

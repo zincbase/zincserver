@@ -1,8 +1,8 @@
 # Technical overview
 
-ZincServer is a _chronological keyed datastore_. It contains a time-based, key-aware storage engine only capable of only a few rudimentary operations:
+ZincServer is a _chronological keyed datastore_. It contains a time-based, key-aware storage engine only capable of a few rudimentary operations:
 
-1. Read all revisions that occurred after time X (`GET` operation). 
+1. Read all revisions that occurred after time X (`GET` operation).
 2. Append a set of new revisions to the datastore (`POST` operation).
 3. Rewrite the datastore with a set of new revisions (`PUT` operation).
 4. Delete the datastore (`DELETE` operation).
@@ -11,25 +11,28 @@ Each datastore is persisted in a single, append-only file. Each revision (or mor
 
 A datastore file is internally structured like the following:
 ```
-[40 byte primary header][0..65535 byte secondary header][key][value], [40 byte primary header][0..65535 byte secondary header][key][value], [40 byte primary header][0..65535 byte secondary header][key][value] ...
+[40 byte primary header][0..65535 byte secondary header][key][value]
+[40 byte primary header][0..65535 byte secondary header][key][value]
+[40 byte primary header][0..65535 byte secondary header][key][value]
+...
 ```
 
-When the server is started, it spawns an HTTP(s) server and becomes available for requests. It does not initially process or load any datastore (aside from its own configuration).
+When the server is started, it spawns an HTTP(S) server and becomes available for requests. It does not initially process or load any datastore (aside from its global configuration datastore).
 
 When a datastore is first referenced in a request, it is loaded (as well as its own configuration, if exists), and a minimal chronological index of its revisions is generated and stored in memory (or alternatively: a cached one is loaded from disk). This index is a very simple sorted list of the form:
 ```
-(timestamp, offset), (timestamp, offset), (timestamp, offset), (timestamp, offset), ... 
+(timestamp, offset), (timestamp, offset), (timestamp, offset), (timestamp, offset), ...
 ```
 
-1. To serve a `GET` request, the index is searched using linear/binary search and the offset of the earliest matching revision is found. The file is then read as-is, directly from disk, starting at the resulting offset and streamed to the response in binary. Note that this data may contain some amount of duplicate revisions (depending on the frequency of compactions). These are managed at the receiving client by keeping only the latest revision of a particular key and ignoring earlier ones.
+1. To serve a `GET` request, the index is searched using linear/binary search and the offset of the earliest matching revision is found. The file is then read as-is, directly from disk, starting at the resulting offset and streamed to the response in binary. Note that this data may contain some amount of duplicate revisions (depending on the frequency of compactions). These are managed at the receiving client by only keeping the latest revision for a particular key and ignoring earlier ones.
 
-2. To serve a 'POST' request, a bulk of serialized revision data is sent by the client in the request body. These revisions are processed as a single transaction: scanned, verified, checksummed, and stamped with a commit timestamp (microsecond resolution), where the last one of them receives a 'transaction end' flag. They are then appended to the datastore file and added to the index.
+2. To serve a `POST` request, a bulk of serialized revision data is sent by the client in the request body. These revisions are processed as a single transaction: scanned, verified, checksummed, and stamped with a commit timestamp (microsecond resolution), where the last one of them receives a 'transaction end' flag. They are then appended to the datastore file and added to the index.
 
-3. A 'PUT' request is similar to 'POST' only the database is cleared before the new revisions are written.
+3. A `PUT` request is similar to `POST` only the datastore is cleared before the new revisions are written.
 
-4. To compact the datastore, the datastore file is read and scanned to create a hash table that maps a key to its latest revision, and then rewritten only to include the latest revisions of each key.
+4. To compact the datastore, the datastore file is read and scanned to create a hash table that maps a key to its latest revision, and then rewritten only to include the latest revisions of each key (to save on memory the actual implementation uses the SHA1 hash of the key in place of its actual bytes).
 
-Note: in order to 'delete' a particular key, a revision with that key is added with a zero-length value. This revision is still stored in the datastore and kept throughout compactions. In order to permanently delete a key, either the database needs to be rewritten, or a compaction should be run with a special 'purge' flag (not currently implemented) that would permanently remove any revisions with no values.
+Note: in order to delete a particular key, a revision with that key is added with a zero-length value. This revision is still stored in the datastore and kept throughout compactions. This is done intentionally to ensure the deletion event would be synchronized with all clients. To permanently delete a key, either the datastore needs to be rewritten, or a compaction should be run with a special 'purge' flag (not currently implemented) that would permanently discard any revisions with no values.
 
 ## Managing concurrency between readers, writers and compactions
 

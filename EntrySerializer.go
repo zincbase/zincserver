@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
 	"fmt"
+	"io"
 )
 
 const PrimaryHeaderSize = 40
@@ -32,7 +32,7 @@ type EntryPrimaryHeader struct {
 
 const (
 	Flag_TransactionEnd uint8 = 1
-	Flag_HeadEntry uint8      = 2
+	Flag_HeadEntry      uint8 = 2
 	DataFormat_Binary   uint8 = 0
 	DataFormat_UTF8     uint8 = 1
 	DataFormat_JSON     uint8 = 2
@@ -215,14 +215,14 @@ func CompactEntries(entries []Entry) []Entry {
 	}
 
 	// Reverse results
-	left := 0;
-	right := len(results) - 1;
+	left := 0
+	right := len(results) - 1
 
 	for left < right {
 		results[left], results[right] = results[right], results[left]
 
-		left += 1;
-		right -= 1;
+		left += 1
+		right -= 1
 	}
 
 	return results

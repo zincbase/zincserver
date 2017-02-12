@@ -61,14 +61,17 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	// Get operations object for the target datastore
 	operations := this.parentServer.GetDatastoreOperations(datastoreName)
 
+	// Get a configuration snapshot
+	config := operations.GetConfigSnapshot()
+
 	// Send CORS headers and handle the OPTIONS request method if needed
 	origin := r.Header.Get("Origin")
 
 	if origin != "" {
-		originAllowed, _ := operations.GetBoolConfigValue("['datastore']['CORS']['origin']['*']['allowed']")
+		originAllowed, _ := config.GetBool("['datastore']['CORS']['origin']['*']['allowed']")
 
 		if !originAllowed {
-			originAllowed, _ = operations.GetBoolConfigValue("['datastore']['CORS']['origin']['" + origin + "']['allowed']")
+			originAllowed, _ = config.GetBool("['datastore']['CORS']['origin']['" + origin + "']['allowed']")
 		}
 
 		if originAllowed {
@@ -147,7 +150,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		}
 
 		// Find the access profile for the given access key hash
-		accessProfileName, err := operations.GetStringConfigValue("['datastore']['accessKeyHash']['" + accessKeyHash + "']")
+		accessProfileName, err := config.GetString("['datastore']['accessKeyHash']['" + accessKeyHash + "']")
 
 		if err != nil {
 			// If a configuration entry wasn't found for the given key, end with an error
@@ -157,7 +160,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 		// Check if the profile support the requested method
 		profileForMethodPrefix := "['accessProfile']['" + accessProfileName + "']['method']['" + method + "']"
-		methodAllowed, _ := operations.GetBoolConfigValue(profileForMethodPrefix + "['allowed']")
+		methodAllowed, _ := config.GetBool(profileForMethodPrefix + "['allowed']")
 
 		if !methodAllowed {
 			// If the profile doesn't support this method, end with an error
@@ -170,11 +173,11 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		clientID := accessKeyHash + "@" + remoteHost
 
 		// Check request rate limits
-		requestLimitInterval, _ := operations.GetInt64ConfigValue(profileForMethodPrefix + "['limit']['requests']['interval']")
+		requestLimitInterval, _ := config.GetInt64(profileForMethodPrefix + "['limit']['requests']['interval']")
 
 		if requestLimitInterval > 0 {
 			// If an interval setting exists, check its corresponding count limit
-			requestLimitCount, _ := operations.GetInt64ConfigValue(profileForMethodPrefix + "['limit']['requests']['count']")
+			requestLimitCount, _ := config.GetInt64(profileForMethodPrefix + "['limit']['requests']['count']")
 
 			// Use the rate limiter object to decide if the allowed request rate has been exceeded
 			allowed := operations.rateLimiter.ProcessEvent(clientID, method, requestLimitInterval, requestLimitCount)
@@ -192,7 +195,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 				continue
 			}
 
-			paramAllowed, _ := operations.GetBoolConfigValue(profileForMethodPrefix + "['param']['" + paramKey + "']['allowed']")
+			paramAllowed, _ := config.GetBool(profileForMethodPrefix + "['param']['" + paramKey + "']['allowed']")
 
 			if !paramAllowed {
 				endRequestWithError(w, r, http.StatusForbidden, errors.New(fmt.Sprintf("The access key '%s' does not provide the permission to use the parameter '%s' in %s requests.", accessKey, paramKey, method)))
@@ -385,11 +388,11 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 			case websocket.BinaryMessage, websocket.TextMessage:
 				ws.Close()
 				return
-			//case websocket.PingMessage:
-			//	Log("ping")
-			//case websocket.PongMessage:
-			//	Log("pong")
-			//case default:
+				//case websocket.PingMessage:
+				//	Log("ping")
+				//case websocket.PongMessage:
+				//	Log("pong")
+				//case default:
 			}
 		}
 	}()

@@ -2,13 +2,13 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
 	"strings"
 	"sync"
-	"errors"
 )
 
 // The datastore operation structure type.
@@ -303,8 +303,11 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 		return 0, ErrEmptyTransaction
 	}
 
+	// Get a configuration snapshot
+	config := this.GetConfigSnapshot()
+
 	// Get the datastore size limit
-	datastoreSizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxSize']")
+	datastoreSizeLimit, _ := config.GetInt64("['datastore']['limit']['maxSize']")
 
 	// Make sure the transaction wouldn't cause it to exceed this limit
 	if datastoreSizeLimit > 0 && this.index.TotalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
@@ -312,7 +315,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 	}
 
 	// Get the datastore size limit
-	entrySizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxEntrySize']")
+	entrySizeLimit, _ := config.GetInt64("['datastore']['limit']['maxEntrySize']")
 
 	// Get commit timestamp
 	commitTimestamp = this.GetColisionFreeTimestamp()
@@ -387,8 +390,11 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTimestamp int64, err error) {
 	// Note: no need to check if the datastore is open here, this should succeed even if it is closed
 
+	// Get a configuration snapshot
+	config := this.GetConfigSnapshot()
+
 	// Get the datastore size limit
-	datastoreSizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxSize']")
+	datastoreSizeLimit, _ := config.GetInt64("['datastore']['limit']['maxSize']")
 
 	// Make sure the transaction wouldn't cause it to exceed this limit
 	if datastoreSizeLimit > 0 && int64(len(transactionBytes)) > datastoreSizeLimit {
@@ -396,7 +402,7 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 	}
 
 	// Get the datastore's entry size limit
-	entrySizeLimit, _ := this.GetInt64ConfigValue("['datastore']['limit']['maxEntrySize']")
+	entrySizeLimit, _ := config.GetInt64("['datastore']['limit']['maxEntrySize']")
 
 	// Get a safe commit timestamp (must be strictly greater than a previous commit timestamp)
 	commitTimestamp = this.GetColisionFreeTimestamp()
@@ -465,8 +471,11 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 		return
 	}
 
+	// Get a configuration snapshot
+	config := this.GetConfigSnapshot()
+
 	// Get the flush setting for this datastore
-	flushEnabled, err := this.GetBoolConfigValue("['datastore']['flush']['enabled']")
+	flushEnabled, err := config.GetBool("['datastore']['flush']['enabled']")
 
 	// If the operation failed or flush is disabled
 	if err != nil || flushEnabled == false {
@@ -475,7 +484,7 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 	}
 
 	// Get the maximum delay value for flushes
-	maxDelayToFlush, err := this.GetInt64ConfigValue("['datastore']['flush']['maxDelay']")
+	maxDelayToFlush, err := config.GetInt64("['datastore']['flush']['maxDelay']")
 
 	// If no matching key was found or an invalid flush delay is specified
 	if err != nil || maxDelayToFlush < 0 {
@@ -583,14 +592,17 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 	// Get the current size of the index
 	currentSize := this.index.TotalSize
 
+	// Get a configuration snapshot
+	config := this.GetConfigSnapshot()
+
 	// Read related configuration options for compaction
-	compactionEnabled, _ := this.GetBoolConfigValue("['datastore']['compaction']['enabled']")
+	compactionEnabled, _ := config.GetBool("['datastore']['compaction']['enabled']")
 	if compactionEnabled == false {
 		return false, nil
 	}
-	compactionMinSize, err1 := this.GetInt64ConfigValue("['datastore']['compaction']['minSize']")
-	compactionMinGrowthRatio, err2 := this.GetFloat64ConfigValue("['datastore']['compaction']['minGrowthRatio']")
-	compactionMinUnusedSizeRatio, err3 := this.GetFloat64ConfigValue("['datastore']['compaction']['minUnusedSizeRatio']")
+	compactionMinSize, err1 := config.GetInt64("['datastore']['compaction']['minSize']")
+	compactionMinGrowthRatio, err2 := config.GetFloat64("['datastore']['compaction']['minGrowthRatio']")
+	compactionMinUnusedSizeRatio, err3 := config.GetFloat64("['datastore']['compaction']['minUnusedSizeRatio']")
 	if err1 != nil || err2 != nil || err3 != nil {
 		return false, nil
 	}
@@ -932,101 +944,21 @@ func (this *DatastoreOperationsEntry) storeHeadEntry() (err error) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-/// Configuration lookup operations
+/// Misc operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Gets a string typed configuration value.
-func (this *DatastoreOperationsEntry) GetStringConfigValue(key string) (value string, err error) {
-	// If a datastore-specific configuration datastore is available
+// Gets an immutable configuration snapshot
+func (this *DatastoreOperationsEntry) GetConfigSnapshot() *DatastoreConfigSnapshot {
+	var datastoreConfig *VarMap
+	var globalConfig *VarMap
+
 	if this.configDatastore != nil {
-		// Get its cached object
-		cachedDatastoreConfig := this.configDatastore.dataCache
-
-		// If its cached object exists
-		if cachedDatastoreConfig != nil {
-			// Lookup the value for the given key
-			value, err = cachedDatastoreConfig.GetString(key)
-
-			// If the key was found
-			if err == nil {
-				// Return its value
-				return
-			}
-		}
+		datastoreConfig = this.configDatastore.dataCache
 	}
 
-	// Otherwise, look up the key in the global configuration and return its value if found
-	return this.parentServer.GlobalConfig().GetString(key)
-}
+	globalConfig = this.parentServer.GlobalConfig()
 
-// Gets a boolean typed configuration value.
-func (this *DatastoreOperationsEntry) GetBoolConfigValue(key string) (value bool, err error) {
-	// If a datastore-specific configuration datastore is available
-	if this.configDatastore != nil {
-		// Get its cached object
-		cachedDatastoreConfig := this.configDatastore.dataCache
-
-		// If its cached object exists
-		if cachedDatastoreConfig != nil {
-			// Lookup the value for the given key
-			value, err = cachedDatastoreConfig.GetBool(key)
-
-			// If the key was found
-			if err == nil {
-				// Return the value
-				return
-			}
-		}
-	}
-
-	// Otherwise, look up the key in the global configuration and return its value if found
-	return this.parentServer.GlobalConfig().GetBool(key)
-}
-
-// Gets a 64-bit integer typed configuration value.
-func (this *DatastoreOperationsEntry) GetInt64ConfigValue(key string) (value int64, err error) {
-	// If a datastore-specific configuration datastore is available
-	if this.configDatastore != nil {
-		// Get its cached object
-		cachedDatastoreConfig := this.configDatastore.dataCache
-
-		// If its cached object exists
-		if cachedDatastoreConfig != nil {
-			// Lookup the value for the given key
-			value, err = cachedDatastoreConfig.GetInt64(key)
-
-			// If the key was found
-			if err == nil {
-				// Return the value
-				return
-			}
-		}
-	}
-
-	// Otherwise, look up the key in the global configuration and return its value if found
-	return this.parentServer.GlobalConfig().GetInt64(key)
-}
-
-// Gets a 64-bit float typed configuration value.
-func (this *DatastoreOperationsEntry) GetFloat64ConfigValue(key string) (value float64, err error) {
-	// If a datastore-specific configuration datastore is available
-	if this.configDatastore != nil {
-		// Get its cached object
-		cachedDatastoreConfig := this.configDatastore.dataCache
-
-		// If its cached object exists
-		if cachedDatastoreConfig != nil {
-			// Lookup the value for the given key
-			value, err = cachedDatastoreConfig.GetFloat64(key)
-
-			// If the key was found
-			if err == nil {
-				return
-			}
-		}
-	}
-
-	return this.parentServer.GlobalConfig().GetFloat64(key)
+	return NewDatastoreConfigSnapshot(datastoreConfig, globalConfig)
 }
 
 // Gets the size of the datastore.
@@ -1051,10 +983,6 @@ func (this *DatastoreOperationsEntry) GetFileSize() (fileSize int64, err error) 
 	// Return the file size
 	return
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-/// Misc operations
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Returns the time the datastore was last modified.
 func (this *DatastoreOperationsEntry) LastModifiedTime() int64 {
@@ -1101,7 +1029,7 @@ func (this *DatastoreOperationsEntry) GetColisionFreeTimestamp() (timestamp int6
 	// Check if timestamp is less than the last modified time
 	if timestamp < lastModifiedTime { // if it is strictly less than last modified time
 		// Calculate the needed sleep time, convert microseconds to floating point milliseconds
-		sleepTimeMilli := float64(lastModifiedTime - timestamp + 1) / 1000
+		sleepTimeMilli := float64(lastModifiedTime-timestamp+1) / 1000
 
 		// Log a message
 		this.parentServer.Logf(1, "The last modification time of datastore '%s' is greater than current time. Sleeping for %f.3ms until the anomaly is resolved..", this.name, sleepTimeMilli)

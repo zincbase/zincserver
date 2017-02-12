@@ -5,7 +5,7 @@ ZincServer is a _chronological keyed datastore_. It contains a time-based, key-a
 1. Read all revisions that occurred after time X (`GET` operation).
 2. Append a set of new revisions to the datastore (`POST` operation).
 3. Rewrite the datastore with a set of new revisions (`PUT` operation).
-4. Delete the datastore (`DELETE` operation).
+4. Destroy the datastore (`DELETE` operation).
 
 Each datastore is persisted in a single, append-only file. Each revision (or more precisely _revision message_) is a binary block of data consisting of a header, a key and a value. Both the key and the value can be arbitrary binary sequences. Revisions are stored sequentially in the file, strictly ordered by commit time.
 

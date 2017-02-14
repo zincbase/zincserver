@@ -12,7 +12,7 @@ import (
 )
 
 // The datastore operation structure type.
-type DatastoreOperationsEntry struct {
+type DatastoreOperations struct {
 	// The parent server associated with this datastore
 	parentServer *Server
 
@@ -25,7 +25,7 @@ type DatastoreOperationsEntry struct {
 	// The datastore file descriptor, if open, otherwise nil
 	file *os.File
 
-	// An datastore index allowing timestamp-to-offset lookups
+	// A datastore index allowing timestamp-to-offset lookups
 	index *DatastoreIndex
 
 	// A notification source that allows to subscribe to future updates in the datastore
@@ -48,10 +48,6 @@ type DatastoreOperationsEntry struct {
 	// This is currently used only to cache configuration datastores
 	dataCache *VarMap
 
-	// The associated configuration datastore operations object. For the configuration datastores
-	// themselves, this would always be nil.
-	configDatastore *DatastoreOperationsEntry
-
 	// A mutex object that is internally used to prevent datastore initialization races (LoadIfNeeded)
 	initializationMutex *sync.Mutex
 
@@ -67,8 +63,8 @@ type DatastoreOperationsEntry struct {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Constructs a new datastore object.
-func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *DatastoreOperationsEntry {
-	return &DatastoreOperationsEntry{
+func NewDatastoreOperations(datastoreName string, parentServer *Server) *DatastoreOperations {
+	return &DatastoreOperations{
 		parentServer: parentServer,
 
 		name:                datastoreName,
@@ -80,7 +76,6 @@ func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *Da
 		headEntryValue:      nil,
 		creationTime:        0,
 		updateNotifier:      NewDatastoreUpdateNotifier(),
-		configDatastore:     nil,
 
 		dataCache:   nil,
 		rateLimiter: NewRateLimiter(),
@@ -88,7 +83,7 @@ func NewDatastoreOperationsEntry(datastoreName string, parentServer *Server) *Da
 }
 
 // Loads the datastore, if needed
-func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
+func (this *DatastoreOperations) LoadIfNeeded() (err error) {
 	// Lock using initialization mutex
 	this.initializationMutex.Lock()
 
@@ -228,7 +223,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 		this.dataCache = updatedDataCache
 	} else { // Otherwise
 		// Load corresponding configuration datastore, if needed
-		err = this.configDatastore.LoadIfNeeded()
+		err = this.ConfigDatastore().LoadIfNeeded()
 
 		// If some error occured while trying load the configuration datastore
 		if err != nil {
@@ -259,7 +254,7 @@ func (this *DatastoreOperationsEntry) LoadIfNeeded() (err error) {
 
 // Creates a reader to the datastore, starting at the first entry with commit timestamp
 // greater than the value given as argument.
-func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader io.Reader, readSize int64, err error) {
+func (this *DatastoreOperations) CreateReader(updatedAfter int64) (reader io.Reader, readSize int64, err error) {
 	// Make sure the datastore is open
 	if this.file == nil {
 		return nil, 0, ErrDatastoreNotOpen
@@ -291,7 +286,7 @@ func (this *DatastoreOperationsEntry) CreateReader(updatedAfter int64) (reader i
 // Commits a transaction, which is given as a stream of serialized entries. The transaction is verified and
 // each one of its entries is stamped with new commit timestamp. Additionally, the last entry is added a transaction
 // end flag.
-func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte) (commitTimestamp int64, err error) {
+func (this *DatastoreOperations) CommitTransaction(transactionBytes []byte) (commitTimestamp int64, err error) {
 	// Make sure the datastore is open
 	if this.file == nil {
 		return 0, ErrDatastoreNotOpen
@@ -387,7 +382,7 @@ func (this *DatastoreOperationsEntry) CommitTransaction(transactionBytes []byte)
 
 // Rewrites the datastore with the new content, applies similar processing to CommitTransaction before
 // writing the given data.
-func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTimestamp int64, err error) {
+func (this *DatastoreOperations) Rewrite(transactionBytes []byte) (commitTimestamp int64, err error) {
 	// Note: no need to check if the datastore is open here, this should succeed even if it is closed
 
 	// Get a configuration snapshot
@@ -464,7 +459,7 @@ func (this *DatastoreOperationsEntry) Rewrite(transactionBytes []byte) (commitTi
 // Schedules a flush if the datastore is configured to invoke it.
 // If the 'maxDelay' setting is set to 0, it flushes immediately
 // (maxDelay=0 would effectively provide a 'full persistence' mode).
-func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
+func (this *DatastoreOperations) ScheduleFlushIfNeeded() {
 	// If a flush is already scheduled
 	if this.flushScheduled {
 		// Return immediately
@@ -558,7 +553,7 @@ func (this *DatastoreOperationsEntry) ScheduleFlushIfNeeded() {
 
 // Takes the given entry stream, deserializes it and non-destructively appends it
 // to the current cache of the datastore's content and returns the result.
-func (this *DatastoreOperationsEntry) CreateUpdatedDataCache(entryStreamReader io.ReaderAt, startOffset int64, endOffset int64) (updatedCache *VarMap, err error) {
+func (this *DatastoreOperations) CreateUpdatedDataCache(entryStreamReader io.ReaderAt, startOffset int64, endOffset int64) (updatedCache *VarMap, err error) {
 	// Check if a cached variable already exists
 	if this.dataCache == nil {
 		// If it doesn't, use a new empty map
@@ -585,7 +580,7 @@ func (this *DatastoreOperationsEntry) CreateUpdatedDataCache(entryStreamReader i
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Compacts the datastore, if needed.
-func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
+func (this *DatastoreOperations) CompactIfNeeded() (bool, error) {
 	// Store the start time of the operation
 	startTime := MonoUnixTimeMilli()
 
@@ -696,7 +691,7 @@ func (this *DatastoreOperationsEntry) CompactIfNeeded() (bool, error) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Releases the file descriptor and clears all in-memory datastore resources.
-func (this *DatastoreOperationsEntry) Release() (err error) {
+func (this *DatastoreOperations) Release() (err error) {
 	// If the datastore file isn't currently open
 	if this.file == nil {
 		// Return with no error
@@ -734,7 +729,7 @@ func (this *DatastoreOperationsEntry) Release() (err error) {
 }
 
 // Destroys the datastore, but not its configuration.
-func (this *DatastoreOperationsEntry) Destroy() (err error) {
+func (this *DatastoreOperations) Destroy() (err error) {
 	// Release the datastore
 	err = this.Release()
 
@@ -768,7 +763,7 @@ func (this *DatastoreOperationsEntry) Destroy() (err error) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Tries rolling back the datastore to the last successful transaction.
-func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
+func (this *DatastoreOperations) RepairIfNeeded() (err error) {
 	// Get the size of the datastore file
 	originalSize, err := this.GetFileSize()
 
@@ -867,7 +862,7 @@ func (this *DatastoreOperationsEntry) RepairIfNeeded() (err error) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Cache the value and creation time of the head entry, always located on range [0:512] of the file
-func (this *DatastoreOperationsEntry) loadHeadEntry() error {
+func (this *DatastoreOperations) loadHeadEntry() error {
 	// Create a new iterator for the datastore
 	next := NewEntryStreamIterator(this.file, 0, HeadEntrySize)
 
@@ -923,7 +918,7 @@ func (this *DatastoreOperationsEntry) loadHeadEntry() error {
 }
 
 // Persist the head entry object to disk
-func (this *DatastoreOperationsEntry) storeHeadEntry() (err error) {
+func (this *DatastoreOperations) storeHeadEntry() (err error) {
 	// If the cached head entry value doesn't exist, error
 	if this.headEntryValue == nil {
 		return errors.New("No head entry is loaded")
@@ -943,26 +938,39 @@ func (this *DatastoreOperationsEntry) storeHeadEntry() (err error) {
 	return
 }
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+/// Configuration operations
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Gets an immutable configuration snapshot
+func (this *DatastoreOperations) GetConfigSnapshot() *DatastoreConfigSnapshot {
+	return NewDatastoreConfigSnapshot(this.LocalConfig(), this.parentServer.GlobalConfig())
+}
+
+func (this *DatastoreOperations) LocalConfig() *VarMap {
+	configDatastore := this.ConfigDatastore()
+
+	if configDatastore == nil {
+		return nil
+	} else {
+		return configDatastore.dataCache
+	}
+}
+
+func (this *DatastoreOperations) ConfigDatastore() *DatastoreOperations {
+	if this.IsConfig() {
+		return nil
+	} else {
+		return this.parentServer.GetDatastoreOperations(this.name + ".config")
+	}
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Misc operations
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Gets an immutable configuration snapshot
-func (this *DatastoreOperationsEntry) GetConfigSnapshot() *DatastoreConfigSnapshot {
-	var datastoreConfig *VarMap
-	var globalConfig *VarMap
-
-	if this.configDatastore != nil {
-		datastoreConfig = this.configDatastore.dataCache
-	}
-
-	globalConfig = this.parentServer.GlobalConfig()
-
-	return NewDatastoreConfigSnapshot(datastoreConfig, globalConfig)
-}
-
 // Gets the size of the datastore.
-func (this *DatastoreOperationsEntry) GetFileSize() (fileSize int64, err error) {
+func (this *DatastoreOperations) GetFileSize() (fileSize int64, err error) {
 	// Make sure the datastore is open
 	if this.file == nil {
 		return 0, ErrDatastoreNotOpen
@@ -985,26 +993,26 @@ func (this *DatastoreOperationsEntry) GetFileSize() (fileSize int64, err error) 
 }
 
 // Returns the time the datastore was last modified.
-func (this *DatastoreOperationsEntry) LastModifiedTime() int64 {
+func (this *DatastoreOperations) LastModifiedTime() int64 {
 	// Look up the latest update timestamp in the index
 	// Note the function would fatally error if the index is nil
 	return this.index.LatestTimestamp()
 }
 
 // Checks if this is a configuration datastore.
-func (this *DatastoreOperationsEntry) IsConfig() bool {
+func (this *DatastoreOperations) IsConfig() bool {
 	// Check if the filename has the suffix '.config'
 	return strings.HasSuffix(this.name, ".config")
 }
 
 // Checks if this is the global configuration datastore.
-func (this *DatastoreOperationsEntry) IsGlobalConfig() bool {
+func (this *DatastoreOperations) IsGlobalConfig() bool {
 	// Check if the filename is exactly ".config"
 	return this.name == ".config"
 }
 
 // Checks if this datastore should be cached in memory.
-func (this *DatastoreOperationsEntry) IsCached() bool {
+func (this *DatastoreOperations) IsCached() bool {
 	// Return based on whether this is a configuration datastore
 	return this.IsConfig()
 }
@@ -1014,7 +1022,7 @@ func (this *DatastoreOperationsEntry) IsCached() bool {
 // it would wait as much as needed until that time has passed.
 // If the last modification time is far in the future, such that the system is running with severly inaccurate
 // clock, the function may effectively stall for a long time.
-func (this *DatastoreOperationsEntry) GetColisionFreeTimestamp() (timestamp int64) {
+func (this *DatastoreOperations) GetColisionFreeTimestamp() (timestamp int64) {
 	timestamp = MonoUnixTimeMicro()
 
 	// If an index is not available, return with the new timestamp, without checking for collisions.

@@ -234,7 +234,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 }
 
 // Handles a GET or HEAD request
-func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
+func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values) (err error) {
 	// Parse the "updatedAfter" query parameter (ParseInt returns 0 if string was empty or invalid).
 	updatedAfter, _ := strconv.ParseInt(query.Get("updatedAfter"), 10, 64)
 
@@ -323,7 +323,7 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 }
 
 // Handles WebSocket upgrade requests
-func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
+func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values) (err error) {
 	// Parse the "updatedAfter" query parameter (ParseInt returns 0 if string was empty or invalid).
 	updatedAfter, _ := strconv.ParseInt(query.Get("updatedAfter"), 10, 64)
 
@@ -482,7 +482,7 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 }
 
 // Handles POST requests
-func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
+func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values) (err error) {
 	// Read the entire request body to memory
 	serializedEntries, err := ReadEntireStream(r.Body)
 	if err != nil {
@@ -556,7 +556,7 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 }
 
 // Handles PUT requests
-func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
+func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values) (err error) {
 	// Read the entire request body to memory
 	serializedEntries, err := ReadEntireStream(r.Body)
 	if err != nil {
@@ -606,7 +606,7 @@ func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *h
 }
 
 // Handles DELETE requests
-func (this *ServerDatastoreHandler) handleDeleteRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperationsEntry, query url.Values) (err error) {
+func (this *ServerDatastoreHandler) handleDeleteRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values) (err error) {
 	// If the target datastore is the global configuration datastore, reject the request
 	// with a "method not allowed" status
 	if operations.IsGlobalConfig() {

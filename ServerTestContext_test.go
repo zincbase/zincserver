@@ -1,8 +1,8 @@
 package main
 
 import (
-	"net/http"
 	"encoding/hex"
+	"net/http"
 )
 
 type ServerTestContext struct {
@@ -38,7 +38,7 @@ func (this *ServerTestContext) Stop() {
 	closer.CloseIdleConnections()
 
 	// Destroy all datastores
-	for _, datastore := range this.server.datastoreOperationEntries {
+	for _, datastore := range this.server.datastores {
 		datastore.Destroy()
 	}
 }

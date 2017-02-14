@@ -30,6 +30,10 @@ func (this *DatastoreConfigSnapshot) GetString(key string) (value string, err er
 		}
 	}
 
+	if this.globalConfig == nil {
+		return
+	}
+
 	// Otherwise, look up the key in the global configuration and return its value if found
 	return this.globalConfig.GetString(key)
 }
@@ -46,6 +50,10 @@ func (this *DatastoreConfigSnapshot) GetBool(key string) (value bool, err error)
 			// Return its value
 			return
 		}
+	}
+
+	if this.globalConfig == nil {
+		return
 	}
 
 	// Otherwise, look up the key in the global configuration and return its value if found
@@ -66,6 +74,10 @@ func (this *DatastoreConfigSnapshot) GetInt64(key string) (value int64, err erro
 		}
 	}
 
+	if this.globalConfig == nil {
+		return
+	}
+
 	// Otherwise, look up the key in the global configuration and return its value if found
 	return this.globalConfig.GetInt64(key)
 }
@@ -82,6 +94,10 @@ func (this *DatastoreConfigSnapshot) GetFloat64(key string) (value float64, err 
 			// Return its value
 			return
 		}
+	}
+
+	if this.globalConfig == nil {
+		return
 	}
 
 	// Otherwise, look up the key in the global configuration and return its value if found

@@ -14,8 +14,8 @@ import (
 )
 
 type Server struct {
-	datastoreOperationEntries map[string]*DatastoreOperationsEntry
-	operationsMapLock         *sync.Mutex
+	datastores       map[string]*DatastoreOperations
+	datastoreMapLock *sync.Mutex
 
 	insecureListener *ServerListener
 	secureListener   *ServerListener
@@ -23,8 +23,6 @@ type Server struct {
 
 	runningStateWaitGroup *sync.WaitGroup
 	bannedIPs             map[string]bool
-
-	globalConfigDatastoreOperations *DatastoreOperationsEntry
 }
 
 type ServerStartupOptions struct {
@@ -40,10 +38,10 @@ type ServerStartupOptions struct {
 
 func NewServer(startupOptions *ServerStartupOptions) *Server {
 	return &Server{
-		datastoreOperationEntries: make(map[string]*DatastoreOperationsEntry),
-		operationsMapLock:         &sync.Mutex{},
-		startupOptions:            startupOptions,
-		runningStateWaitGroup:     &sync.WaitGroup{},
+		datastores:            make(map[string]*DatastoreOperations),
+		datastoreMapLock:      &sync.Mutex{},
+		startupOptions:        startupOptions,
+		runningStateWaitGroup: &sync.WaitGroup{},
 	}
 }
 
@@ -60,9 +58,7 @@ func (this *Server) Start() {
 	}
 
 	// Load configuration datastore
-	this.globalConfigDatastoreOperations = this.GetDatastoreOperations(".config")
-
-	err = this.globalConfigDatastoreOperations.LoadIfNeeded()
+	err = this.GlobalConfigDatastore().LoadIfNeeded()
 	if err != nil {
 		switch err.(type) {
 		case *os.PathError:
@@ -75,15 +71,15 @@ func (this *Server) Start() {
 			}
 
 			this.Log(0, "No configuration datastore found.")
-			this.Log(0, "Creating default one with master key '" + newMasterKey + "'.")
+			this.Log(0, "Creating default one with master key '"+newMasterKey+"'.")
 			this.Log(0, "")
 
-			_, err = this.globalConfigDatastoreOperations.Rewrite(DefaultServerConfig(newMasterKey))
+			_, err = this.GlobalConfigDatastore().Rewrite(DefaultServerConfig(newMasterKey))
 			if err != nil {
 				panic(err)
 			}
 
-			err = this.globalConfigDatastoreOperations.LoadIfNeeded()
+			err = this.GlobalConfigDatastore().LoadIfNeeded()
 			if err != nil {
 				panic(err)
 			}
@@ -93,7 +89,7 @@ func (this *Server) Start() {
 		}
 	}
 
-	if this.globalConfigDatastoreOperations.dataCache == nil {
+	if this.GlobalConfigDatastore().dataCache == nil {
 		panic(errors.New("Failed loading or creating global configuration datastore"))
 	}
 	//
@@ -161,8 +157,8 @@ func (this *Server) Stop() {
 	}
 	this.runningStateWaitGroup.Wait()
 
-	for _, operationsEntry := range this.datastoreOperationEntries {
-		operationsEntry.Release()
+	for _, datastore := range this.datastores {
+		datastore.Release()
 	}
 }
 
@@ -178,33 +174,58 @@ func (this *Server) Logf(logLevel int, format string, values ...interface{}) {
 	}
 }
 
+func (this *Server) GetDatastoreOperations(datastoreName string) (datastoreOperations *DatastoreOperations) {
+	// Get the map entry for the datastore
+	datastoreOperations = this.datastores[datastoreName]
 
-func (this *Server) GetDatastoreOperations(datastoreName string) (datastoreOperations *DatastoreOperationsEntry) {
-	// Create a new entry if it truly doesn't exist
-	this.operationsMapLock.Lock()
-	datastoreOperations = this.datastoreOperationEntries[datastoreName]
-
+	// If no entry exists
 	if datastoreOperations == nil {
-		datastoreOperations = NewDatastoreOperationsEntry(datastoreName, this)
-		this.datastoreOperationEntries[datastoreName] = datastoreOperations
-	}
-	this.operationsMapLock.Unlock()
+		// Lock
+		this.datastoreMapLock.Lock()
 
-	if !datastoreOperations.IsConfig() {
-		datastoreOperations.configDatastore = this.GetDatastoreOperations(datastoreName + ".config")
+		// Check again to ensure no data race occurred
+		datastoreOperations = this.datastores[datastoreName]
+
+		// If an operations object was found this time
+		if datastoreOperations != nil {
+			// Return it
+			return
+		}
+
+		// Create a new operations object for the datastore
+		datastoreOperations = NewDatastoreOperations(datastoreName, this)
+
+		// Add it in the map
+		this.PutDatastoreOperations(datastoreOperations)
+
+		// Unlock
+		this.datastoreMapLock.Unlock()
 	}
 
 	return
 }
 
-func (this *Server) GlobalConfig() *VarMap {
-	globalConfig := this.globalConfigDatastoreOperations.dataCache
+func (this *Server) PutDatastoreOperations(datastoreOperations *DatastoreOperations) {
+	// Clone the map
+	newMap := make(map[string]*DatastoreOperations)
 
-	if globalConfig != nil {
-		return globalConfig
-	} else {
-		return NewEmptyVarMap()
+	for key, value := range this.datastores {
+		newMap[key] = value
 	}
+
+	// Set the new entry in the map
+	newMap[datastoreOperations.name] = datastoreOperations
+
+	// Replace the old map with the new map
+	this.datastores = newMap
+}
+
+func (this *Server) GlobalConfigDatastore() *DatastoreOperations {
+	return this.GetDatastoreOperations(".config")
+}
+
+func (this *Server) GlobalConfig() *VarMap {
+	return this.GlobalConfigDatastore().dataCache
 }
 
 func DefaultServerConfig(masterKey string) []byte {

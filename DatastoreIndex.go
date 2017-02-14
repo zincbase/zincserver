@@ -21,6 +21,31 @@ type DatastoreIndex struct {
 	Validator DatastoreIndexEntryValidator
 }
 
+// Construct a datastore index with no validator
+func NewDatastoreIndex() *DatastoreIndex {
+	return &DatastoreIndex{
+		TotalSize: 0,
+		Entries:   []DatastoreIndexEntry{},
+		Validator: nil,
+	}
+}
+
+// Construct a datastore index with a custom validator
+func NewDatastoreIndexWithValidator(validator DatastoreIndexEntryValidator) *DatastoreIndex {
+	return &DatastoreIndex{
+		TotalSize: 0,
+		Entries:   []DatastoreIndexEntry{},
+		Validator: validator,
+	}
+}
+
+// Construct a datastore index with full checksum verification (i.e. both header and payload)
+func NewDatastoreIndexWithFullChecksumVerification() *DatastoreIndex {
+	return NewDatastoreIndexWithValidator(func(result *EntryStreamIteratorResult) error {
+		return result.VerifyAllChecksums()
+	})
+}
+
 // Append the index from a stream of serialized entries
 func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffset int64, endOffset int64) error {
 	// Create an entry stream iterator
@@ -109,27 +134,11 @@ func (this *DatastoreIndex) LatestTimestamp() int64 {
 	return this.Entries[len(this.Entries)-1].timestamp
 }
 
-// Construct a datastore index with no validator
-func NewDatastoreIndex() *DatastoreIndex {
+// Clone this index
+func (this *DatastoreIndex) Clone() *DatastoreIndex {
 	return &DatastoreIndex{
-		TotalSize: 0,
-		Entries:   []DatastoreIndexEntry{},
-		Validator: nil,
+		TotalSize: this.TotalSize,
+		Entries:   this.Entries,
+		Validator: this.Validator,
 	}
-}
-
-// Construct a datastore index with a custom validator
-func NewDatastoreIndexWithValidator(validator DatastoreIndexEntryValidator) *DatastoreIndex {
-	return &DatastoreIndex{
-		TotalSize: 0,
-		Entries:   []DatastoreIndexEntry{},
-		Validator: validator,
-	}
-}
-
-// Construct a datastore index with full checksum verification (i.e. both header and payload)
-func NewDatastoreIndexWithFullChecksumVerification() *DatastoreIndex {
-	return NewDatastoreIndexWithValidator(func(result *EntryStreamIteratorResult) error {
-		return result.VerifyAllChecksums()
-	})
 }

@@ -23,6 +23,7 @@ type Server struct {
 
 	runningStateWaitGroup *sync.WaitGroup
 	bannedIPs             map[string]bool
+	rateLimiter           *RateLimiter
 }
 
 type ServerStartupOptions struct {
@@ -42,6 +43,7 @@ func NewServer(startupOptions *ServerStartupOptions) *Server {
 		datastoreMapLock:      &sync.Mutex{},
 		startupOptions:        startupOptions,
 		runningStateWaitGroup: &sync.WaitGroup{},
+		rateLimiter:           NewRateLimiter(),
 	}
 }
 

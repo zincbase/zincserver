@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 // The datastore operation structure type.
@@ -31,17 +32,13 @@ type DatastoreOperations struct {
 	// A notification source that allows to subscribe to future updates in the datastore
 	updateNotifier *DatastoreUpdateNotifier
 
-	// An object tracking the rate and type of operations performed by each client, allowing to set
-	// limits for this datastore
-	rateLimiter *RateLimiter
-
-	// A flag that signifies if flush operation is currently scheduled
-	flushScheduled bool
+	// A scheduler object to schedule flushes to the datastore file
+	flushScheduler *DatastoreFlushScheduler
 
 	// Cached head entry value
 	headEntryValue *HeadEntryValue
 
-	// Datastore creation time
+	// Cached datastore creation time value (= head entry's commit time)
 	creationTime int64
 
 	// A cache object containing the datastore content in parsed form.
@@ -50,9 +47,6 @@ type DatastoreOperations struct {
 
 	// A mutex object that is internally used to prevent datastore initialization races (LoadIfNeeded)
 	initializationMutex *sync.Mutex
-
-	// A mutex object that is internally used to synchronize flushing operations
-	flushMutex *sync.Mutex
 
 	// A reader-writer mutex for this datastore. Should only be used by consumers, not internally.
 	sync.RWMutex
@@ -71,14 +65,12 @@ func NewDatastoreOperations(datastoreName string, parentServer *Server) *Datasto
 		filePath:            parentServer.startupOptions.StoragePath + "/" + datastoreName,
 		file:                nil,
 		initializationMutex: &sync.Mutex{},
-		flushMutex:          &sync.Mutex{},
+		flushScheduler:      NewDatastoreFlushScheduler(),
 		index:               nil,
 		headEntryValue:      nil,
 		creationTime:        0,
 		updateNotifier:      NewDatastoreUpdateNotifier(),
-
-		dataCache:   nil,
-		rateLimiter: NewRateLimiter(),
+		dataCache:           nil,
 	}
 }
 
@@ -461,7 +453,7 @@ func (this *DatastoreOperations) Rewrite(transactionBytes []byte) (commitTimesta
 // (maxDelay=0 would effectively provide a 'full persistence' mode).
 func (this *DatastoreOperations) ScheduleFlushIfNeeded() {
 	// If a flush is already scheduled
-	if this.flushScheduled {
+	if this.flushScheduler.FlushScheduled() {
 		// Return immediately
 		return
 	}
@@ -487,68 +479,30 @@ func (this *DatastoreOperations) ScheduleFlushIfNeeded() {
 		return
 	}
 
-	// Define a local function that will perorm the flush operation
-	flush := func(file *os.File) {
-		// Store the start time of the operation
+	flushIfNeeded := func() {
 		startTime := MonoUnixTimeMilli()
 
-		// Call the OS `sync` function
-		err := file.Sync()
-
-		// If no error while executing the operation
+		didFlush, err := this.flushScheduler.EnsureFlush(this.file, time.Duration(maxDelayToFlush)*time.Millisecond)
 		if err == nil {
+			if !didFlush {
+				return
+			}
+
 			// Log a success message
-			this.parentServer.Logf(1, "Flushed datastore '%s' in %dms", this.name, MonoUnixTimeMilli()-startTime)
+			this.parentServer.Logf(1, "Flushed datastore '%s' %dms after written", this.name, MonoUnixTimeMilli()-startTime)
 		} else { // Otherwise,
 			// Log a failure message
-			this.parentServer.Log(1, "Error flushing datastore '%s'. %s", this.name, err.Error())
+			this.parentServer.Logf(1, "Error flushing datastore '%s'. %s", this.name, err.Error())
 		}
 	}
 
-	// If a zero delay is defined
 	if maxDelayToFlush == 0 {
-		// Flush immediately
-		flush(this.file)
-
-		// Then return
-		return
+		flushIfNeeded()
+	} else {
+		go func() {
+			flushIfNeeded()
+		}()
 	}
-
-	// Otherwise, a greater-than-zero flush time is defined
-
-	// Set a flag to signify a flush is currently scheduled
-	this.flushScheduled = true
-
-	// Store the file descriptor in a local variable
-	targetFile := this.file
-
-	// Increment the file descriptor reference count, to make sure it isn't released
-	// before the flush has completed
-	FileDescriptors.Increment(targetFile)
-
-	// Continue in a new goroutine
-	go func() {
-		// If the specified delay is larger than zero
-		if maxDelayToFlush > 0 {
-			// Wait until it's over
-			Sleep(float64(maxDelayToFlush))
-		}
-
-		// Acquire a lock for the flush
-		this.flushMutex.Lock()
-
-		// Defer this lock to be released once the function has completed
-		defer this.flushMutex.Unlock()
-
-		// Disable the flush scheduled flag
-		this.flushScheduled = false
-
-		// Perform the flush using the helper function
-		flush(targetFile)
-
-		// Decrement the file descriptor reference counter
-		FileDescriptors.Decrement(targetFile)
-	}()
 }
 
 // Takes the given entry stream, deserializes it and non-destructively appends it
@@ -701,7 +655,7 @@ func (this *DatastoreOperations) Release() (err error) {
 	// Decrement the file descriptor reference counter
 	err = FileDescriptors.Decrement(this.file)
 
-	// If an error occured when decrementing the counter
+	// If an error occured while decrementing the counter
 	if err != nil {
 		// Return the error
 		return
@@ -937,7 +891,6 @@ func (this *DatastoreOperations) storeHeadEntry() (err error) {
 
 	return
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 /// Configuration operations

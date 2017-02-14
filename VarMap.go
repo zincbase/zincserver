@@ -3,13 +3,10 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	//"strings"
-	"sync"
 )
 
 type VarMap struct {
 	entries map[string]interface{}
-	sync.RWMutex
 }
 
 func NewVarMap(entries map[string]interface{}) *VarMap {

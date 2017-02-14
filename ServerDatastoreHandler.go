@@ -180,7 +180,7 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 			requestLimitCount, _ := config.GetInt64(profileForMethodPrefix + "['limit']['requests']['count']")
 
 			// Use the rate limiter object to decide if the allowed request rate has been exceeded
-			allowed := operations.rateLimiter.ProcessEvent(clientID, method, requestLimitInterval, requestLimitCount)
+			allowed := this.parentServer.rateLimiter.ProcessEvent(datastoreName, clientID, method, requestLimitInterval, requestLimitCount)
 
 			// If the rate has been exceeded, end with an error
 			if !allowed {

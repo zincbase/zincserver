@@ -29,15 +29,16 @@ func NewRateLimiter() *RateLimiter {
 }
 
 // Process an event
-func (this *RateLimiter) ProcessEvent(clientID string, operation string, timeInterval int64, limit int64) bool {
+func (this *RateLimiter) ProcessEvent(datastoreName string, clientID string, operation string, timeInterval int64, limit int64) bool {
 	// Lock this object
 	this.Lock()
 
 	// Unlock when the function returns
 	defer this.Unlock()
 
-	// Concat the client id and operation to get the key in the lookup table
-	key := clientID + " " + operation
+	// Fromat to get the key in the lookup table
+	key := datastoreName + ":" + clientID + ":" + operation
+
 	// Record the current time
 	currentTime := MonoUnixTimeMilli()
 

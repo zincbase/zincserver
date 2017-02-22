@@ -34,17 +34,17 @@ Run `zincserver start -help` for more startup options.
 
 ## Initializing global configuration and getting a master key.
 
-When the server is launched, it creates a special `.config` datastore at the specified storage path, if one doesn't exist already. The global configuration datastore is initialized with a boilerplate default configuration and a securely generated master key, which is printed to the console. The master key grants full access to all datastores and is the only access key permitted to view or modify the global configuration datastore.
+When the server is launched, it creates a special `.config` datastore at the specified storage path, if one doesn't exist already. The global configuration datastore is initialized with a boilerplate default configuration and a securely generated master key, which is printed to the console. The master key grants full access to all datastores and is the only access key permitted to view or modify a configuration datastore (both global and dedicated ones).
 
 ## Configuring the server
 
 ZincServer allows two levels of configuration. Global and datastore-specific. Global configuration is stored at the `.config` datastore, and datastore-specific settings can be specified in a datastore named `<DatastoreName>.config`. Datastore-specific configuration inherits from the global one and would override any existing global setting when a value with identical key is set.
 
-ZincServer configuration is fully live and can be freely modified while the server is running and data is read or written to it, with changes taking effect immediately and no need for any restarts. The web-based editor tool can be used to conveniently create and manage datastores, and datastore configurations, set up access keys and profiles.
+ZincServer configuration is fully live and can be freely modified while the server is running and data is read or written to it, with changes taking effect instantly and no need for any restarts. The web-based editor tool can be used to conveniently create and manage datastores, and datastore configurations, set up access keys and profiles. Since configuration datastores aren't different from regular ones, they can be created and modified using the REST API, or any higher level API (they can be cloned and modified as normal ZincDB databases).
 
 ## Setting up the editor
 
-The editor is a web-based application that can view and edit any ZincDB datastore, including ZincServer configuration datastores.
+The editor is a web-based application that can view and edit any ZincDB compatible datastore, including ZincServer configuration datastores.
 
 1. Make sure you have the latest [Node.js](https://nodejs.org/en/) installed.
 2. Download the [ZincDB repository](https://github.com/zincbase/zincdb) by selecting `Clone or Download` -> `Download ZIP` at the main repository page (or alternatively clone the repository by running `git clone https://github.com/zincbase/zincdb.git`).
@@ -63,7 +63,7 @@ The default configuration contains two boilerplate access profiles: `Reader` and
 ["datastore","accessKeyHash","a84825308039ffcc6ea3cdb0022776079651bd00"]
 ```
 
-and give it the value `"Reader"` (note the string used in the path is the hex encoded SHA1 hash of the the target access key as plain string).
+and give it the value `"Reader"` (note the string used in the path is the hexadecimal encoded SHA1 hash of the the target access key as plain string).
 
 ## Modifying and creating access profiles, configuring limits, quotas and misc settings
 

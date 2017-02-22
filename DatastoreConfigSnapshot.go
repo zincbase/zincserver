@@ -4,24 +4,24 @@ import ()
 
 // An object storing the configuration state for a particular datastore
 type DatastoreConfigSnapshot struct {
-	datastoreConfig *VarMap
-	globalConfig    *VarMap
+	GlobalConfig    *VarMap
+	DedicatedConfig *VarMap
 }
 
 // A constructor
-func NewDatastoreConfigSnapshot(datastoreConfig *VarMap, globalConfig *VarMap) *DatastoreConfigSnapshot {
+func NewDatastoreConfigSnapshot(globalConfig *VarMap, dedicatedConfig *VarMap) *DatastoreConfigSnapshot {
 	return &DatastoreConfigSnapshot{
-		datastoreConfig: datastoreConfig,
-		globalConfig:    globalConfig,
+		GlobalConfig:    globalConfig,
+		DedicatedConfig: dedicatedConfig,
 	}
 }
 
 // Gets a string typed configuration value.
 func (this *DatastoreConfigSnapshot) GetString(key string) (value string, err error) {
 	// If a datastore-specific configuration is available
-	if this.datastoreConfig != nil {
+	if this.DedicatedConfig != nil {
 		// Lookup the value for the given key
-		value, err = this.datastoreConfig.GetString(key)
+		value, err = this.DedicatedConfig.GetString(key)
 
 		// If the key was found
 		if err == nil {
@@ -30,20 +30,30 @@ func (this *DatastoreConfigSnapshot) GetString(key string) (value string, err er
 		}
 	}
 
-	if this.globalConfig == nil {
+	if this.GlobalConfig == nil {
 		return
 	}
 
 	// Otherwise, look up the key in the global configuration and return its value if found
-	return this.globalConfig.GetString(key)
+	return this.GlobalConfig.GetString(key)
+}
+
+// Gets a string typed configuration value from the global configuration only
+func (this *DatastoreConfigSnapshot) GetString_GlobalOnly(key string) (value string, err error) {
+	if this.GlobalConfig == nil {
+		return
+	}
+
+	// Otherwise, look up the key in the global configuration and return its value if found
+	return this.GlobalConfig.GetString(key)
 }
 
 // Gets a boolean typed configuration value.
 func (this *DatastoreConfigSnapshot) GetBool(key string) (value bool, err error) {
 	// If a datastore-specific configuration is available
-	if this.datastoreConfig != nil {
+	if this.DedicatedConfig != nil {
 		// Lookup the value for the given key
-		value, err = this.datastoreConfig.GetBool(key)
+		value, err = this.DedicatedConfig.GetBool(key)
 
 		// If the key was found
 		if err == nil {
@@ -52,20 +62,20 @@ func (this *DatastoreConfigSnapshot) GetBool(key string) (value bool, err error)
 		}
 	}
 
-	if this.globalConfig == nil {
+	if this.GlobalConfig == nil {
 		return
 	}
 
 	// Otherwise, look up the key in the global configuration and return its value if found
-	return this.globalConfig.GetBool(key)
+	return this.GlobalConfig.GetBool(key)
 }
 
 // Gets a 64-bit integer typed configuration value.
 func (this *DatastoreConfigSnapshot) GetInt64(key string) (value int64, err error) {
 	// If a datastore-specific configuration is available
-	if this.datastoreConfig != nil {
+	if this.DedicatedConfig != nil {
 		// Lookup the value for the given key
-		value, err = this.datastoreConfig.GetInt64(key)
+		value, err = this.DedicatedConfig.GetInt64(key)
 
 		// If the key was found
 		if err == nil {
@@ -74,20 +84,20 @@ func (this *DatastoreConfigSnapshot) GetInt64(key string) (value int64, err erro
 		}
 	}
 
-	if this.globalConfig == nil {
+	if this.GlobalConfig == nil {
 		return
 	}
 
 	// Otherwise, look up the key in the global configuration and return its value if found
-	return this.globalConfig.GetInt64(key)
+	return this.GlobalConfig.GetInt64(key)
 }
 
 // Gets a 64-bit float typed configuration value.
 func (this *DatastoreConfigSnapshot) GetFloat64(key string) (value float64, err error) {
 	// If a datastore-specific configuration is available
-	if this.datastoreConfig != nil {
+	if this.DedicatedConfig != nil {
 		// Lookup the value for the given key
-		value, err = this.datastoreConfig.GetFloat64(key)
+		value, err = this.DedicatedConfig.GetFloat64(key)
 
 		// If the key was found
 		if err == nil {
@@ -96,10 +106,10 @@ func (this *DatastoreConfigSnapshot) GetFloat64(key string) (value float64, err 
 		}
 	}
 
-	if this.globalConfig == nil {
+	if this.GlobalConfig == nil {
 		return
 	}
 
 	// Otherwise, look up the key in the global configuration and return its value if found
-	return this.globalConfig.GetFloat64(key)
+	return this.GlobalConfig.GetFloat64(key)
 }

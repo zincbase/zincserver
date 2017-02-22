@@ -9,7 +9,7 @@ import (
 	"syscall"
 )
 
-const versionString = "0.2.0"
+const versionString = "0.3.0"
 
 func main() {
 	handleOsSignals()
@@ -48,12 +48,17 @@ func parseStartCommand(args []string) {
 
 	commandFlagSet := flag.NewFlagSet("start", flag.PanicOnError)
 
+	commandFlagSet.StringVar(&commandOptions.StoragePath, "storagePath", commandOptions.StoragePath, "Root datastore storage directory path. *Note*: the storage directory should not contain any files other than ZincServer data files! (required)")
+
 	commandFlagSet.IntVar(&commandOptions.InsecurePort, "insecurePort", commandOptions.InsecurePort, "Port to use for insecure connections.")
+	commandFlagSet.BoolVar(&commandOptions.InsecureListenerLoopbackOnly, "insecureListenerLoopbackOnly", commandOptions.InsecureListenerLoopbackOnly, "Only accept loopback connections on the insecure listener.")
+
 	commandFlagSet.IntVar(&commandOptions.SecurePort, "securePort", commandOptions.SecurePort, "Port to use for secure connections. Requires valid 'certFile' and 'keyFile' arguments to be provided as well.")
-	commandFlagSet.BoolVar(&commandOptions.EnableHTTP2, "enableHTTP2", commandOptions.EnableHTTP2, "Enable HTTP2 support. Only relevant when secure connections are enabled.")
+	commandFlagSet.BoolVar(&commandOptions.SecureListenerLoopbackOnly, "secureListenerLoopbackOnly", commandOptions.SecureListenerLoopbackOnly, "Only accept loopback connections on the secure listener.")
 	commandFlagSet.StringVar(&commandOptions.CertFile, "certFile", commandOptions.CertFile, "Path to a certificate file (X.509) to use with secure connections.")
 	commandFlagSet.StringVar(&commandOptions.KeyFile, "keyFile", commandOptions.KeyFile, "Path to a private key file (X.509) to use with secure connections.")
-	commandFlagSet.StringVar(&commandOptions.StoragePath, "storagePath", commandOptions.StoragePath, "Root datastore storage directory path. *Note*: the storage directory should not contain any files other than ZincServer data files! (required)")
+	commandFlagSet.BoolVar(&commandOptions.EnableHTTP2, "enableHTTP2", commandOptions.EnableHTTP2, "Enable HTTP2 support. Only relevant when secure connections are enabled.")
+
 	commandFlagSet.IntVar(&commandOptions.LogLevel, "logLevel", commandOptions.LogLevel, "Logging level.")
 	commandFlagSet.BoolVar(&commandOptions.NoAutoMasterKey, "noAutoMasterKey", commandOptions.NoAutoMasterKey, "Suppress generation of a random master key when a default configuration is created. Leave it empty instead (highly insecure, should only be used for testing).")
 	commandFlagSet.BoolVar(&helpRequested, "help", helpRequested, "Show this help message.")

@@ -43,10 +43,6 @@ func (this *DatastoreFlushScheduler) EnsureFlush(file *os.File, maxDelay time.Du
 	// Unlock for scheduling
 	this.scheduleLock.Unlock()
 
-	// Increment the file descriptor reference count, to make sure it isn't released
-	// before the flush has completed
-	FileDescriptors.Increment(file)
-
 	// Wait until the delay time has passed
 	time.Sleep(maxDelay)
 
@@ -58,9 +54,6 @@ func (this *DatastoreFlushScheduler) EnsureFlush(file *os.File, maxDelay time.Du
 		// Return the error
 		return false, err
 	}
-
-	// Decrement the file descriptor reference count
-	FileDescriptors.Decrement(file)
 
 	return true, nil
 }

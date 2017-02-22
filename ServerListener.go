@@ -15,10 +15,16 @@ type ServerListener struct {
 	parentServer    *Server
 	wrappedListener net.Listener
 	protocol        string
+	loopbackOnly    bool
 }
 
-func NewServerListener(parentServer *Server, wrappedListener net.Listener, protocol string) *ServerListener {
-	return &ServerListener{parentServer: parentServer, wrappedListener: wrappedListener, protocol: protocol}
+func NewServerListener(parentServer *Server, wrappedListener net.Listener, protocol string, loopbackOnly bool) *ServerListener {
+	return &ServerListener{
+		parentServer: parentServer,
+		wrappedListener: wrappedListener,
+		protocol: protocol,
+		loopbackOnly: loopbackOnly,
+	}
 }
 
 func (this *ServerListener) Accept() (conn net.Conn, err error) {
@@ -30,9 +36,8 @@ func (this *ServerListener) Accept() (conn net.Conn, err error) {
 		}
 
 		remoteHost, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		loopbackOnly, _ := this.parentServer.GlobalConfig().GetBool("['server']['" + this.protocol + "']['loopbackOnly']")
 
-		if loopbackOnly && !loopbackIPRegExp.MatchString(remoteHost) {
+		if this.loopbackOnly && !loopbackIPRegExp.MatchString(remoteHost) {
 			conn.Write([]byte("HTTP/1.1 403 Forbidden\r\nConnection: Close\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 30\r\n\r\nIncoming host IP is forbidden."))
 			conn.Close()
 			continue

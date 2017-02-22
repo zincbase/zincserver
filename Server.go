@@ -10,39 +10,59 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 )
 
+type ServerStartupOptions struct {
+	InsecurePort                 int
+	InsecureListenerLoopbackOnly bool
+	SecurePort                   int
+	SecureListenerLoopbackOnly   bool
+	CertFile                     string
+	KeyFile                      string
+	EnableHTTP2                  bool
+	StoragePath                  string
+	LogLevel                     int
+	NoAutoMasterKey              bool
+}
+
+func DefaultServerStartupOptions() *ServerStartupOptions {
+	return &ServerStartupOptions{
+		InsecurePort:                 0,
+		InsecureListenerLoopbackOnly: false,
+		SecurePort:                   0,
+		SecureListenerLoopbackOnly:   false,
+		CertFile:                     "cert.pem",
+		KeyFile:                      "key.pem",
+		EnableHTTP2:                  false,
+		StoragePath:                  "",
+		LogLevel:                     1,
+		NoAutoMasterKey:              false,
+	}
+}
+
 type Server struct {
+	startupOptions *ServerStartupOptions
+
 	datastores       map[string]*DatastoreOperations
 	datastoreMapLock *sync.Mutex
 
 	insecureListener *ServerListener
 	secureListener   *ServerListener
-	startupOptions   *ServerStartupOptions
 
 	runningStateWaitGroup *sync.WaitGroup
 	bannedIPs             map[string]bool
 	rateLimiter           *RateLimiter
 }
 
-type ServerStartupOptions struct {
-	InsecurePort    int
-	SecurePort      int
-	EnableHTTP2     bool
-	CertFile        string
-	KeyFile         string
-	StoragePath     string
-	LogLevel        int
-	NoAutoMasterKey bool
-}
-
 func NewServer(startupOptions *ServerStartupOptions) *Server {
 	return &Server{
+		startupOptions:        startupOptions,
 		datastores:            make(map[string]*DatastoreOperations),
 		datastoreMapLock:      &sync.Mutex{},
-		startupOptions:        startupOptions,
 		runningStateWaitGroup: &sync.WaitGroup{},
+		bannedIPs:             make(map[string]bool),
 		rateLimiter:           NewRateLimiter(),
 	}
 }
@@ -59,8 +79,10 @@ func (this *Server) Start() {
 		panic("The specified storage path '" + this.startupOptions.StoragePath + "' does not exist.")
 	}
 
-	// Load configuration datastore
-	err = this.GlobalConfigDatastore().LoadIfNeeded()
+	// Load global configuration datastore
+	globalConfigDatastore := this.GetDatastoreOperations(".config")
+	_, err = globalConfigDatastore.LoadIfNeeded(false)
+
 	if err != nil {
 		switch err.(type) {
 		case *os.PathError:
@@ -76,12 +98,17 @@ func (this *Server) Start() {
 			this.Log(0, "Creating default one with master key '"+newMasterKey+"'.")
 			this.Log(0, "")
 
-			_, err = this.GlobalConfigDatastore().Rewrite(DefaultServerConfig(newMasterKey))
+
+			// Initialize default configuration datastore
+			defaultConfigBytes := DefaultServerConfig(newMasterKey)
+
+			timestamp := MonoUnixTimeMicro()
+			err = ValidateAndPrepareTransaction(defaultConfigBytes, timestamp, 0)
 			if err != nil {
 				panic(err)
 			}
 
-			err = this.GlobalConfigDatastore().LoadIfNeeded()
+			err = globalConfigDatastore.Rewrite(defaultConfigBytes, timestamp)
 			if err != nil {
 				panic(err)
 			}
@@ -91,15 +118,14 @@ func (this *Server) Start() {
 		}
 	}
 
-	if this.GlobalConfigDatastore().dataCache == nil {
+	if globalConfigDatastore.State == nil {
 		panic(errors.New("Failed loading or creating global configuration datastore"))
 	}
-	//
 
 	if this.startupOptions.SecurePort > 0 {
 		cer, err := tls.LoadX509KeyPair(this.startupOptions.CertFile, this.startupOptions.KeyFile)
 		if err != nil {
-			panic(err.Error())
+			panic(err)
 		}
 
 		tlsConfig := tls.Config{
@@ -113,9 +139,10 @@ func (this *Server) Start() {
 		listenerAddress := fmt.Sprintf(":%d", this.startupOptions.SecurePort)
 		tlsListener, err := tls.Listen("tcp", listenerAddress, &tlsConfig)
 		if err != nil {
-			panic(err.Error())
+			panic(err)
 		}
-		this.secureListener = NewServerListener(this, tlsListener, "https")
+
+		this.secureListener = NewServerListener(this, tlsListener, "https", this.startupOptions.SecureListenerLoopbackOnly)
 
 		this.runningStateWaitGroup.Add(1)
 		go func() {
@@ -134,7 +161,7 @@ func (this *Server) Start() {
 		if err != nil {
 			panic(err)
 		}
-		this.insecureListener = NewServerListener(this, tcpListener, "http")
+		this.insecureListener = NewServerListener(this, tcpListener, "http", this.startupOptions.InsecureListenerLoopbackOnly)
 
 		this.runningStateWaitGroup.Add(1)
 		go func() {
@@ -160,7 +187,7 @@ func (this *Server) Stop() {
 	this.runningStateWaitGroup.Wait()
 
 	for _, datastore := range this.datastores {
-		datastore.Release()
+		datastore.Close()
 	}
 }
 
@@ -195,10 +222,21 @@ func (this *Server) GetDatastoreOperations(datastoreName string) (datastoreOpera
 		}
 
 		// Create a new operations object for the datastore
-		datastoreOperations = NewDatastoreOperations(datastoreName, this)
+		datastoreOperations = NewDatastoreOperations(datastoreName, this, IsConfigDatastoreName(datastoreName))
 
-		// Add it in the map
-		this.PutDatastoreOperations(datastoreOperations)
+		// Create a new map object
+		newMap := make(map[string]*DatastoreOperations)
+
+		// Clone the existing map into it
+		for key, value := range this.datastores {
+			newMap[key] = value
+		}
+
+		// Set the new entry in the map
+		newMap[datastoreOperations.Name] = datastoreOperations
+
+		// Atomically replace the old map with the new map
+		this.datastores = newMap
 
 		// Unlock
 		this.datastoreMapLock.Unlock()
@@ -207,27 +245,45 @@ func (this *Server) GetDatastoreOperations(datastoreName string) (datastoreOpera
 	return
 }
 
-func (this *Server) PutDatastoreOperations(datastoreOperations *DatastoreOperations) {
-	// Clone the map
-	newMap := make(map[string]*DatastoreOperations)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+/// Configuration operations
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-	for key, value := range this.datastores {
-		newMap[key] = value
+// Gets an immutable configuration snapshot for a particular datastore
+func (this *Server) GetConfigSnapshot(datastoreName string) (*DatastoreConfigSnapshot, error) {
+	globalConfigDatastoreState := this.GetDatastoreOperations(".config").State
+
+	var globalConfig *VarMap
+
+	if globalConfigDatastoreState == nil {
+		globalConfig = nil
+	} else {
+		globalConfig = globalConfigDatastoreState.DataCache
 	}
 
-	// Set the new entry in the map
-	newMap[datastoreOperations.name] = datastoreOperations
+	// If the target datastore is itself a configuration datastore
+	if IsConfigDatastoreName(datastoreName) {
+		// Only include the global config in the snapshot
+		return NewDatastoreConfigSnapshot(globalConfig, nil), nil
+	} else { // Otherwise
+		// Include its dedicated config as well, if exists
+		dedicatedConfigDatastoreState, err := this.GetDatastoreOperations(datastoreName + ".config").LoadIfNeeded(false)
+		var dedicatedConfig *VarMap = nil
 
-	// Replace the old map with the new map
-	this.datastores = newMap
-}
+		if err == nil {
+			dedicatedConfig = dedicatedConfigDatastoreState.DataCache
+		} else {
+			switch err.(type) {
+			// If no dedicated config file was found, set the dedicated config map to nil
+			case *os.PathError:
+				dedicatedConfig = nil
+			default:
+				return nil, err
+			}
+		}
 
-func (this *Server) GlobalConfigDatastore() *DatastoreOperations {
-	return this.GetDatastoreOperations(".config")
-}
-
-func (this *Server) GlobalConfig() *VarMap {
-	return this.GlobalConfigDatastore().dataCache
+		return NewDatastoreConfigSnapshot(globalConfig, dedicatedConfig), nil
+	}
 }
 
 func DefaultServerConfig(masterKey string) []byte {
@@ -241,9 +297,6 @@ func DefaultServerConfig(masterKey string) []byte {
 
 	defaultConfigStringEntries := []JsonEntry{
 		JsonEntry{`"['server']['masterKeyHash']"`, `"` + masterKeyHashHex + `"`},
-
-		JsonEntry{`"['server']['http']['loopbackOnly']"`, `false`},
-		JsonEntry{`"['server']['https']['loopbackOnly']"`, `false`},
 
 		JsonEntry{`"['datastore']['compaction']['enabled']"`, `true`},
 		JsonEntry{`"['datastore']['compaction']['minSize']"`, `4096`},
@@ -287,15 +340,6 @@ func DefaultServerConfig(masterKey string) []byte {
 	return defaultConfigSerialized
 }
 
-func DefaultServerStartupOptions() *ServerStartupOptions {
-	return &ServerStartupOptions{
-		InsecurePort:    0,
-		SecurePort:      0,
-		CertFile:        "cert.pem",
-		KeyFile:         "key.pem",
-		EnableHTTP2:     false,
-		StoragePath:     "",
-		LogLevel:        1,
-		NoAutoMasterKey: false,
-	}
+func IsConfigDatastoreName(datastoreName string) bool {
+	return strings.HasSuffix(datastoreName, ".config")
 }

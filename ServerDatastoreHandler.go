@@ -40,10 +40,10 @@ func init() {
 // The main handler for all datastore requests
 func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Extract the datastore name form the request path
-	submatches := datastorePathRegexp.FindStringSubmatch(r.URL.Path)
+	requestPathSubmatches := datastorePathRegexp.FindStringSubmatch(r.URL.Path)
 
 	// If no valid datastore name was found
-	if len(submatches) == 0 || len(submatches[1]) == 0 || len(submatches[1]) > 128 {
+	if len(requestPathSubmatches) == 0 || len(requestPathSubmatches[1]) == 0 || len(requestPathSubmatches[1]) > 128 {
 		// Log a message
 		this.parentServer.Log(1, "["+r.RemoteAddr+"]: "+r.Method+" "+r.URL.Path+" <invalid path>")
 
@@ -52,17 +52,25 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 		// End with an error
 		endRequestWithError(w, r, http.StatusBadRequest, errors.New("Invalid datastore request path, should be of the form '/datastore/[name][.config?]', where [name] may only contain the characters A-Z, a-z and 0-9 and have length between 1 and 128 characters."))
+
 		return
 	}
 
 	// Get target datastore name from the match results
-	datastoreName := submatches[1]
+	datastoreName := requestPathSubmatches[1]
 
-	// Get operations object for the target datastore
-	operations := this.parentServer.GetDatastoreOperations(datastoreName)
+	// Get a configuration snapshot for the datastore
+	config, configLoadErr := this.parentServer.GetConfigSnapshot(datastoreName)
 
-	// Get a configuration snapshot
-	config := operations.GetConfigSnapshot()
+	if configLoadErr != nil {
+		// Ensure that cross-origin requests will also be able to receive the error
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// End with an error
+		endRequestWithError(w, r, http.StatusInternalServerError, configLoadErr)
+
+		return
+	}
 
 	// Send CORS headers and handle the OPTIONS request method if needed
 	origin := r.Header.Get("Origin")
@@ -134,17 +142,17 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	// Verify the access key has a valid length and character set
-	if !accessKeyRegexp.MatchString(accessKey) || (len(accessKey) != 0 && len(accessKey) != 32) {
+	if len(accessKey) > 0 && (len(accessKey) != 32 || !accessKeyRegexp.MatchString(accessKey)) {
 		endRequestWithError(w, r, http.StatusBadRequest, errors.New("A non-empty access key must contain exactly 32 lowercase hexedecimal digits."))
 		return
 	}
 
 	// Get master key hash
-	masterKeyHash, _ := this.parentServer.GlobalConfig().GetString("['server']['masterKeyHash']")
+	masterKeyHash, _ := config.GetString_GlobalOnly("['server']['masterKeyHash']")
 
 	// Check authorization and rate limits
 	if accessKeyHash != masterKeyHash {
-		if operations.IsConfig() {
+		if IsConfigDatastoreName(datastoreName) {
 			endRequestWithError(w, r, http.StatusUnauthorized, errors.New("A configuration datastore can only be accessed through the master key."))
 			return
 		}
@@ -205,6 +213,9 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	// Get operations object for the target datastore
+	operations := this.parentServer.GetDatastoreOperations(datastoreName)
+
 	var err error
 
 	// Now that all general security checks have passed, dispatch the appropriate handler for
@@ -216,9 +227,9 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		err = this.handleWebsocketRequest(w, r, datastoreName, operations, parsedQuery)
 		err = nil
 	case "POST":
-		err = this.handlePostRequest(w, r, datastoreName, operations, parsedQuery)
+		err = this.handlePostRequest(w, r, datastoreName, operations, parsedQuery, config)
 	case "PUT":
-		err = this.handlePutRequest(w, r, datastoreName, operations, parsedQuery)
+		err = this.handlePutRequest(w, r, datastoreName, operations, parsedQuery, config)
 	case "DELETE":
 		err = this.handleDeleteRequest(w, r, datastoreName, operations, parsedQuery)
 	default:
@@ -245,16 +256,11 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 		return
 	}
 
-	// Lock the datastore for reading
-	operations.RLock()
-
 	// Load the datastore if needed
-	err = operations.LoadIfNeeded()
+	state, err := operations.LoadIfNeeded(true)
 
-	// Handle any error that occured when trying to load the datastore
+	// Handle any error that occured while trying to load the datastore
 	if err != nil {
-		operations.RUnlock()
-
 		switch err.(type) {
 		// If the error was a "file not found error", end with a 404 Not Found status code
 		case *os.PathError:
@@ -267,13 +273,14 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 	}
 
 	// Get the time that datastore was last modified
-	lastModifiedTime := operations.LastModifiedTime()
+	lastModifiedTime := state.LastModifiedTime()
 
 	// If 'waitUntilNonempty' parameter was requested, and the update time threshold is larger than
 	// the last modified time, wait until matching data is available and only then return it
 	if query.Get("waitUntilNonempty") == "true" && updatedAfter >= lastModifiedTime {
-		updateChannel := operations.updateNotifier.CreateUpdateNotificationChannel(updatedAfter)
-		operations.RUnlock()
+		state.Decrement()
+
+		updateChannel := operations.UpdateNotifier.CreateUpdateNotificationChannel(updatedAfter)
 
 		<-updateChannel
 
@@ -281,13 +288,14 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 		return
 	}
 
+	defer state.Decrement()
+
 	// Create a datastore reader
 	var resultReader io.Reader
 	var readSize int64
 
-	resultReader, readSize, err = operations.CreateReader(updatedAfter)
+	resultReader, readSize, err = operations.CreateReader(state, updatedAfter)
 	if err != nil {
-		operations.RUnlock()
 		return err
 	}
 
@@ -299,13 +307,6 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 	// If the request had a GET method (HEAD would skip this), increment the file descriptor counter
 	// for the datastore to ensure the descripor wouldn't be closed until the read operation is over
 	bodyShouldBeSent := r.Method == "GET"
-	if bodyShouldBeSent {
-		FileDescriptors.Increment(operations.file)
-		defer FileDescriptors.Decrement(operations.file)
-	}
-
-	// Unlock reader lock
-	operations.RUnlock()
 
 	// Write the header
 	w.WriteHeader(http.StatusOK)
@@ -333,20 +334,11 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 		return
 	}
 
-	//
-	// Ensure the datastore exists
-	//
-	// Lock the datastore for reading
-	operations.RLock()
+	// Load the datastore if needed, to ensure it exists
+	state, err := operations.LoadIfNeeded(false)
 
-	// Load the datastore if needed
-	err = operations.LoadIfNeeded()
-
-	// Handle any error that occured when trying to load the datastore
+	// Handle any error that occured while trying to load the datastore
 	if err != nil {
-		// Unlock reader lock
-		operations.RUnlock()
-
 		switch err.(type) {
 		// If the error was a "file not found error", end with a 404 Not Found status code
 		case *os.PathError:
@@ -357,9 +349,6 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 		// Otherwise, the error would be reported as an internal server error
 		return
 	}
-
-	// Unlock reader lock
-	operations.RUnlock()
 
 	// Create a WebSocket upgrader object
 	var websocketUpgrader = websocket.Upgrader{
@@ -372,7 +361,7 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 		return
 	}
 
-	// Handle messages sents by the client
+	// Handle messages sent by the client
 	go func() {
 		for {
 			messageType, _, err := ws.NextReader()
@@ -392,36 +381,31 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 				//	Log("ping")
 				//case websocket.PongMessage:
 				//	Log("pong")
-				//case default:
 			}
 		}
 	}()
 
 	for {
-		// Lock the datastore for reading
-		operations.RLock()
-
-		// Load the datastore if needed
-		err = operations.LoadIfNeeded()
+		// Load the datastore if needed and increment reference count
+		state, err = operations.LoadIfNeeded(true)
 
 		// If an error ocurred loading the datastore
 		if err != nil {
-			// Unlock reader lock
-			operations.RUnlock()
-
 			// Close the WebSocket connection (no way to return an error to the user)
 			ws.Close()
 			return
 		}
 
 		// Get the time the datastore was last modified
-		lastModifiedTime := operations.LastModifiedTime()
+		lastModifiedTime := state.LastModifiedTime()
 
 		// If the requested update time threshold is equal or greater than the last modification time
 		if updatedAfter >= lastModifiedTime {
+			// Decrement reference count
+			state.Decrement()
+
 			// Wait until data is available
-			updateChannel := operations.updateNotifier.CreateUpdateNotificationChannel(updatedAfter)
-			operations.RUnlock()
+			updateChannel := operations.UpdateNotifier.CreateUpdateNotificationChannel(updatedAfter)
 
 			<-updateChannel
 			continue
@@ -431,12 +415,13 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 		var resultReader io.Reader
 		var messageWriter io.WriteCloser
 
-		resultReader, _, err = operations.CreateReader(updatedAfter)
+		resultReader, _, err = operations.CreateReader(state, updatedAfter)
 
 		// If an error ocurred creating the reader
 		if err != nil {
-			// Unlock
-			operations.RUnlock()
+			// Decrement reference count
+			state.Decrement()
+
 			// Close the connection
 			ws.Close()
 			return err
@@ -445,28 +430,23 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 		// Create a writer for a binary WebSocket message
 		messageWriter, err = ws.NextWriter(websocket.BinaryMessage)
 
-		// If creating the writer failed
+		// If creating the websocket writer failed
 		if err != nil {
-			// Unlock
-			operations.RUnlock()
+			// Decrement reference count
+			state.Decrement()
+
 			// Close the connection
 			ws.Close()
 			return err
 		}
 
-		// Increment the datastore's file descriptor
-		FileDescriptors.Increment(operations.file)
-
-		// Unlock the reader lock to the datastore
-		operations.RUnlock()
-
 		// Stream the matching data to the WebSocket writer
 		_, err = io.Copy(messageWriter, resultReader)
 
-		// Decrement the datastore's file desriptor
-		FileDescriptors.Decrement(operations.file)
+		// Decrement reference count
+		state.Decrement()
 
-		// If an error ocurred when streaming the data
+		// If an error ocurred while streaming the data
 		if err != nil {
 			// Close
 			ws.Close()
@@ -482,23 +462,30 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 }
 
 // Handles POST requests
-func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values) (err error) {
+func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values, config *DatastoreConfigSnapshot) (err error) {
 	// Read the entire request body to memory
-	serializedEntries, err := ReadEntireStream(r.Body)
+	transactionBytes, err := ReadEntireStream(r.Body)
 	if err != nil {
 		return
 	}
 
-	// Lock the datastore for writing
-	operations.Lock()
+	// If the request body was empty
+	if len(transactionBytes) == 0 {
+		// End with an error
+		endRequestWithError(w, r, http.StatusBadRequest, errors.New("No transaction data was included in the request body"))
+		return
+	}
+
+	// Wait to enter the writer queue
+	writerQueueToken := operations.WriterQueue.Enter()
 
 	// Load the datastore if needed
-	err = operations.LoadIfNeeded()
+	state, err := operations.LoadIfNeeded(false)
 
-	// If an error ocurred when loading the datastore
+	// If an error ocurred while loading the datastore
 	if err != nil {
-		// Unlock the datastore
-		operations.Unlock()
+		// Leave the writer queue
+		operations.WriterQueue.Leave(writerQueueToken)
 
 		switch err.(type) {
 		case *os.PathError:
@@ -511,38 +498,97 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 		return
 	}
 
-	// Commit the transaction bytes given in the request body
-	commitTimestamp, err := operations.CommitTransaction(serializedEntries)
+	// Get the datastore size limit
+	datastoreSizeLimit, _ := config.GetInt64("['datastore']['limit']['maxSize']")
 
-	// Unlock the datastore
-	operations.Unlock()
+	// Make sure the transaction wouldn't cause it to exceed this limit
+	if datastoreSizeLimit > 0 && state.Index.TotalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
+		// Leave the writer queue
+		operations.WriterQueue.Leave(writerQueueToken)
 
-	// If an error occured when commiting the transaction
+		// End the request with a 'forbidden' error
+		endRequestWithError(w, r, http.StatusForbidden, ErrDatastoreSizeLimitExceeded{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", operations.Name, datastoreSizeLimit)})
+
+		return
+	}
+
+	// Get the entry size limit
+	datastoreEntrySizeLimit, _ := config.GetInt64("['datastore']['limit']['maxEntrySize']")
+
+	// Get commit timestamp
+	commitTimestamp := operations.GetCollisionFreeTimestamp(state)
+
+	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
+	// for last entry
+	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp, datastoreEntrySizeLimit)
 	if err != nil {
+		// Leave the writer queue
+		operations.WriterQueue.Leave(writerQueueToken)
+
 		// Handle an unexpected end of stream error
 		if err == io.ErrUnexpectedEOF {
 			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected end of stream was encountered while validating the given transaction"))
 			err = nil
-		} else if err == ErrEmptyTransaction {
-			endRequestWithError(w, r, http.StatusBadRequest, errors.New("No transaction data was included in the request body"))
-			err = nil
 		} else { // Handle other errors
 			switch err.(type) {
-			// Check for entry rejected errors and respond with a forbidden request status
+			// Check for entry rejected errors and respond with a bad request status
 			case ErrEntryRejected:
 				endRequestWithError(w, r, http.StatusBadRequest, err)
 				err = nil
 
 			// Check for datastore too large errors and respond with a forbidden request status
-			case ErrDatastoreSizeLimitExceeded, ErrDatastoreEntrySizeLimitExceeded:
+			case ErrDatastoreEntrySizeLimitExceeded:
 				endRequestWithError(w, r, http.StatusForbidden, err)
 				err = nil
 			}
 		}
 
+		return
+	}
+
+	// Get the flush setting for this datastore
+	flushEnabled, _ := config.GetBool("['datastore']['flush']['enabled']")
+
+	// Get the maximum delay value for flushes
+	maxFlushDelay, _ := config.GetInt64("['datastore']['flush']['maxDelay']")
+
+	// Append the processed transaction bytes to the datastore
+	err = operations.Append(transactionBytes, state, commitTimestamp, flushEnabled, maxFlushDelay)
+
+	// If an error occured while appending the transaction
+	if err != nil {
+		// Leave the writer queue
+		operations.WriterQueue.Leave(writerQueueToken)
+
 		// Otherwise, any other error would be considered an internal server error
 		return
 	}
+
+	// Read related configuration options for compaction
+	compactionEnabled, _ := config.GetBool("['datastore']['compaction']['enabled']")
+
+	if compactionEnabled == true {
+		compactionMinSize, err1 := config.GetInt64("['datastore']['compaction']['minSize']")
+		compactionMinGrowthRatio, err2 := config.GetFloat64("['datastore']['compaction']['minGrowthRatio']")
+		compactionMinUnusedSizeRatio, err3 := config.GetFloat64("['datastore']['compaction']['minUnusedSizeRatio']")
+
+		if err1 == nil && err2 == nil && err3 == nil {
+			// Perform a compaction check and compact if needed
+			_, err = operations.CompactIfNeeded(operations.State, compactionMinSize, compactionMinGrowthRatio, compactionMinUnusedSizeRatio)
+
+			// If an error occurred while compacting
+			if err != nil {
+				// Leave the writer queue
+				operations.WriterQueue.Leave(writerQueueToken)
+
+				// Return the error
+				return
+			}
+		}
+	}
+
+	// Leave the writer queue
+	operations.WriterQueue.Leave(writerQueueToken)
 
 	// Set the response content type to JSON
 	w.Header().Set("Content-Type", "application/json")
@@ -556,43 +602,84 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 }
 
 // Handles PUT requests
-func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values) (err error) {
+func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values, config *DatastoreConfigSnapshot) (err error) {
 	// Read the entire request body to memory
-	serializedEntries, err := ReadEntireStream(r.Body)
+	transactionBytes, err := ReadEntireStream(r.Body)
 	if err != nil {
 		return
 	}
 
-	// Lock the datastore for writing
-	operations.Lock()
-	// Rewrite the datastore with the given data
-	commitTimestamp, err := operations.Rewrite(serializedEntries)
-	// Unlock the datastore
-	operations.Unlock()
+	// Wait to enter the writer queue
+	writerQueueToken := operations.WriterQueue.Enter()
 
-	// If an error occured when commiting the transaction
+	// Get the datastore size limit
+	datastoreSizeLimit, _ := config.GetInt64("['datastore']['limit']['maxSize']")
+
+	// Make sure the transaction wouldn't cause it to exceed this limit
+	if datastoreSizeLimit > 0 && int64(len(transactionBytes)) > datastoreSizeLimit {
+		// Leave the writer queue
+		operations.WriterQueue.Leave(writerQueueToken)
+
+		endRequestWithError(w, r, http.StatusForbidden, ErrDatastoreSizeLimitExceeded{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", operations.Name, datastoreSizeLimit)})
+		err = nil
+
+		return
+	}
+
+	// Get the entry size limit
+	datastoreEntrySizeLimit, _ := config.GetInt64("['datastore']['limit']['maxEntrySize']")
+
+	// Try to load the existing datastore and ignore any error
+	// (this is only done to get the latest ensure the transaction timestamp for the rewritten datastore
+	//  is always strictly greater than the latest one)
+	state, _ := operations.LoadIfNeeded(false)
+
+	// Get commit timestamp (note the state argument passed may be nil)
+	commitTimestamp := operations.GetCollisionFreeTimestamp(state)
+
+	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
+	// for last entry
+	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp, datastoreEntrySizeLimit)
+
+	// If the validation failed
 	if err != nil {
+		// Leave the writer queue
+		operations.WriterQueue.Leave(writerQueueToken)
+
 		// Handle an unexpected end of stream error
 		if err == io.ErrUnexpectedEOF {
-			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected EOF was encountered while validating the given entry stream"))
+			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected end of stream was encountered while validating the given transaction"))
 			err = nil
 		} else { // Handle other errors
 			switch err.(type) {
-			// Check for entry rejected errors and respond with a forbidden request status
+			// Check for entry rejected errors and respond with a bad request status
 			case ErrEntryRejected:
 				endRequestWithError(w, r, http.StatusBadRequest, err)
 				err = nil
 
 			// Check for datastore too large errors and respond with a forbidden request status
-			case ErrDatastoreSizeLimitExceeded, ErrDatastoreEntrySizeLimitExceeded:
+			case ErrDatastoreEntrySizeLimitExceeded:
 				endRequestWithError(w, r, http.StatusForbidden, err)
 				err = nil
 			}
 		}
 
-		// Otherwise, any other error would be considered an internal server error
 		return
 	}
+
+	// Rewrite the datastore with the given data
+	err = operations.Rewrite(transactionBytes, commitTimestamp)
+
+	// If an error occured while commiting the transaction
+	if err != nil {
+		operations.WriterQueue.Leave(writerQueueToken)
+
+		// Otherwise, any error would be considered an internal server error
+		return
+	}
+
+	// Leave the writer queue
+	operations.WriterQueue.Leave(writerQueueToken)
 
 	// Set the response content type to JSON
 	w.Header().Set("Content-Type", "application/json")
@@ -609,20 +696,20 @@ func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *h
 func (this *ServerDatastoreHandler) handleDeleteRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values) (err error) {
 	// If the target datastore is the global configuration datastore, reject the request
 	// with a "method not allowed" status
-	if operations.IsGlobalConfig() {
+	if datastoreName == ".config" {
 		endRequestWithError(w, r, http.StatusMethodNotAllowed, errors.New("The global configuration datastore cannot be deleted."))
 		return
 	}
+	// Wait to enter the writer queue
+	writerQueueToken := operations.WriterQueue.Enter()
 
-	// Lock the datastore for writing
-	operations.Lock()
 	// Destroy the datastore
 	err = operations.Destroy()
-	// Unlock the datastore
-	operations.Unlock()
 
-	// If an error ocurred when destroying the datastore
+	// If an error ocurred while destroying the datastore
 	if err != nil {
+		operations.WriterQueue.Leave(writerQueueToken)
+
 		switch err.(type) {
 		// If the error was becuase the file doesn't exist, end with a 404 Not Found status
 		case *os.PathError, *os.LinkError:
@@ -632,6 +719,9 @@ func (this *ServerDatastoreHandler) handleDeleteRequest(w http.ResponseWriter, r
 
 		return
 	}
+
+	// Leave the writer queue
+	operations.WriterQueue.Leave(writerQueueToken)
 
 	// Set the response content type to plain text
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

@@ -86,7 +86,7 @@ func (this *DatastoreOperations) LoadIfNeeded(increment bool) (*DatastoreState, 
 	// Load the datastore
 	state, err := this.Load()
 
-	// If an error occurred when loading the datastore
+	// If an error occurred while loading the datastore
 	if err != nil {
 		// Return the error
 		return nil, err
@@ -192,7 +192,7 @@ func (this *DatastoreOperations) Load() (*DatastoreState, error) {
 			// Rename the file to the new name
 			renameErr := os.Rename(this.FilePath, newFilePath)
 
-			// If an error occurred when renaming the file
+			// If an error occurred while renaming the file
 			if renameErr != nil {
 				// Log a message
 				this.ParentServer.Logf(1, "Datastore '%s' cannot be opened as it has an invalid, missing or corrupted head entry. Trying to rename the file has failed due to error: %s.", this.Name, renameErr.Error())
@@ -268,7 +268,7 @@ func (this *DatastoreOperations) Append(transactionBytes []byte, state *Datastor
 	// Append the transaction to the file
 	_, err = newState.File.WriteAt(transactionBytes, int64(state.Index.TotalSize))
 
-	// If an error occured when writing to the file
+	// If an error occured while writing to the file
 	if err != nil {
 		// Return the error
 		return
@@ -535,7 +535,7 @@ func (this *DatastoreOperations) RepairIfNeeded(state *DatastoreState) (*Datasto
 	// Get the size of the datastore file
 	originalSize, err := state.GetFileSize()
 
-	// If an error occurred when getting the size
+	// If an error occurred while getting the size
 	if err != nil {
 		// Return the error
 		return nil, err
@@ -544,7 +544,7 @@ func (this *DatastoreOperations) RepairIfNeeded(state *DatastoreState) (*Datasto
 	// Scan the file to get a safe truncation size
 	repairedSize, err := FindSafeTruncationSize(NewPrefetchingReaderAt(state.File), originalSize)
 
-	// If an error occurred when checking for a truncation size
+	// If an error occurred while checking for a truncation size
 	if err != nil {
 		// Return the error
 		return nil, err
@@ -561,7 +561,7 @@ func (this *DatastoreOperations) RepairIfNeeded(state *DatastoreState) (*Datasto
 	backupFilePath := fmt.Sprintf("%s.corrupted-%d", this.FilePath, MonoUnixTimeMicro())
 	err = CreateOrRewriteFileSafe(backupFilePath, state.File)
 
-	// If an error occurred when creating a backup file
+	// If an error occurred while creating a backup file
 	if err != nil {
 		// Log a message
 		this.ParentServer.Logf(1, "Error while creating a backup of corrupted datastore '%s': %s.", this.Name, err.Error())
@@ -576,7 +576,7 @@ func (this *DatastoreOperations) RepairIfNeeded(state *DatastoreState) (*Datasto
 		err = CreateOrRewriteFileSafe(this.FilePath, NewRangeReader(state.File, 0, repairedSize))
 	}
 
-	// If an error occurred when rewriting the file
+	// If an error occurred while rewriting the file
 	if err != nil {
 		// Log a message
 		this.ParentServer.Logf(1, "Error while repairing datastore '%s': %s", this.Name, err.Error())
@@ -588,7 +588,7 @@ func (this *DatastoreOperations) RepairIfNeeded(state *DatastoreState) (*Datasto
 	// Reload the datastore
 	newState, err := this.Load()
 
-	// If an error occurred when recreating the index
+	// If an error occurred while recreating the index
 	if err != nil {
 		// Log a failure message
 		this.ParentServer.Logf(1, "Failed to reload datastore '%s' after repair.", this.Name)

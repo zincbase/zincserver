@@ -35,6 +35,9 @@ type DatastoreOperations struct {
 
 	// A mutex object that is internally used to prevent state read/write races
 	stateLock *sync.Mutex
+
+	// Last path error
+	lastPathError *os.PathError
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,8 +54,9 @@ func NewDatastoreOperations(datastoreName string, parentServer *Server, isCached
 		State:          nil,
 		IsCached:       isCached,
 		UpdateNotifier: NewDatastoreUpdateNotifier(),
-		stateLock:      &sync.Mutex{},
 		WriterQueue:    NewExecQueue(),
+		stateLock:      &sync.Mutex{},
+		lastPathError:  nil,
 	}
 }
 
@@ -63,6 +67,12 @@ func (this *DatastoreOperations) LoadIfNeeded(increment bool) (*DatastoreState, 
 
 	// Unlock the state mutex whenever the function exits
 	defer this.stateLock.Unlock()
+
+	// If the file was previously known not to be found and that result was cached, immediately
+	// return with that error.
+	if this.lastPathError != nil {
+		return nil, this.lastPathError
+	}
 
 	// Get existing state object
 	existingState := this.State
@@ -86,8 +96,19 @@ func (this *DatastoreOperations) LoadIfNeeded(increment bool) (*DatastoreState, 
 	// Load the datastore
 	state, err := this.Load()
 
-	// If an unrecoverable error occurred while loading the datastore
+	// If an error occurred while loading the datastore
 	if err != nil {
+		// If the file wasn't found, cache that outcome to prevent unnecessary future calls to the file system.
+		// This gives a significant performance boost, especially when trying to load dedicated configuration
+		// datastores, which are quite common to be missing.
+		//
+		// However a disadvantage is that files that are copied to the storage directory after the server has
+		// been started are not guaranteed to be seen by the server. One way to counteract this would be to reset
+		// the cached value to nil every time interval (say every a second or two)
+		if pathError, ok := err.(*os.PathError); ok {
+			this.lastPathError = pathError
+		}
+
 		// Return the error
 		return nil, err
 	}
@@ -486,13 +507,12 @@ func (this *DatastoreOperations) ReplaceState(newState *DatastoreState) (err err
 	oldState := this.State
 	this.State = newState
 
+	// Reset last path error
+	this.lastPathError = nil
+
 	if oldState != nil {
 		if newState == nil || newState.File.Fd() != oldState.File.Fd() {
 			err = oldState.Decrement()
-		}
-
-		if err != nil {
-			return
 		}
 	}
 

@@ -25,6 +25,7 @@ type ServerStartupOptions struct {
 	StoragePath                  string
 	LogLevel                     int
 	NoAutoMasterKey              bool
+	Profile                      bool
 }
 
 func DefaultServerStartupOptions() *ServerStartupOptions {
@@ -39,6 +40,7 @@ func DefaultServerStartupOptions() *ServerStartupOptions {
 		StoragePath:                  "",
 		LogLevel:                     1,
 		NoAutoMasterKey:              false,
+		Profile:                      false,
 	}
 }
 
@@ -97,7 +99,6 @@ func (this *Server) Start() {
 			this.Log(0, "No configuration datastore found.")
 			this.Log(0, "Creating default one with master key '"+newMasterKey+"'.")
 			this.Log(0, "")
-
 
 			// Initialize default configuration datastore
 			defaultConfigBytes := DefaultServerConfig(newMasterKey)

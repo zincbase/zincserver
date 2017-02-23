@@ -3,11 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/pkg/profile"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
 )
+
+var profilerSession interface {
+	Stop()
+}
 
 const versionString = "0.3.0"
 
@@ -61,6 +66,8 @@ func parseStartCommand(args []string) {
 
 	commandFlagSet.IntVar(&commandOptions.LogLevel, "logLevel", commandOptions.LogLevel, "Logging level.")
 	commandFlagSet.BoolVar(&commandOptions.NoAutoMasterKey, "noAutoMasterKey", commandOptions.NoAutoMasterKey, "Suppress generation of a random master key when a default configuration is created. Leave it empty instead (highly insecure, should only be used for testing).")
+	commandFlagSet.BoolVar(&commandOptions.Profile, "profile", commandOptions.Profile, "Profile CPU usage (a report would be generated when the program exists).")
+
 	commandFlagSet.BoolVar(&helpRequested, "help", helpRequested, "Show this help message.")
 	commandFlagSet.Parse(args)
 
@@ -107,6 +114,11 @@ func parseStartCommand(args []string) {
 ---------------------------------------------------------`)
 
 	server := NewServer(commandOptions)
+
+	if commandOptions.Profile == true {
+		profilerSession = profile.Start(profile.CPUProfile, profile.ProfilePath("."), profile.NoShutdownHook)
+	}
+
 	server.Start()
 	server.runningStateWaitGroup.Wait()
 }
@@ -147,6 +159,11 @@ func handleOsSignals() {
 	go func() {
 		<-c
 		//fmt.Println("SIGTERM")
+
+		if profilerSession != nil {
+			profilerSession.Stop()
+		}
+
 		os.Exit(1)
 	}()
 }

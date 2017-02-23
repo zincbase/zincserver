@@ -86,7 +86,7 @@ func (this *DatastoreOperations) LoadIfNeeded(increment bool) (*DatastoreState, 
 	// Load the datastore
 	state, err := this.Load()
 
-	// If an error occurred while loading the datastore
+	// If an unrecoverable error occurred while loading the datastore
 	if err != nil {
 		// Return the error
 		return nil, err
@@ -362,9 +362,13 @@ func (this *DatastoreOperations) ScheduleFlushIfNeeded(state *DatastoreState, ma
 		}
 	}
 
+	// If maximum delay is 0
 	if maxDelay == 0 {
+		// Flush synchronously
 		flushIfNeeded()
-	} else {
+	} else { // Otherwise
+		// Flush asynchonously
+		//
 		// Increment the reference count to ensure the file isn't closed before or while the goroutine
 		// executes
 		state.Increment()

@@ -147,6 +147,11 @@ func (this *DatastoreState) GetFileSize() (fileSize int64, err error) {
 	return
 }
 
+// Returns the total size indexed by this state object
+func (this *DatastoreState) Size() int64 {
+	return this.Index.TotalSize
+}
+
 // Returns the time the datastore was last modified.
 func (this *DatastoreState) LastModifiedTime() int64 {
 	// Look up the latest update timestamp in the index

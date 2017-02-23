@@ -138,22 +138,44 @@ func (this *DatastoreOperations) Load() (*DatastoreState, error) {
 	}
 
 	// Create a new index object
-	state.Index = NewDatastoreIndexWithFullChecksumVerification()
+	state.Index = NewDatastoreIndex()
 
 	// Add new entries to the index by scanning the datastore file
-	err = state.Index.AppendFromEntryStream(NewPrefetchingReaderAt(state.File), 0, fileSize)
+	err = state.Index.AppendFromEntryStream(NewPrefetchingReaderAt(state.File), 0, fileSize, func(iteratorResult *EntryStreamIteratorResult) error {
+		checksumErr := iteratorResult.VerifyAllChecksums()
+		if checksumErr != nil {
+			return checksumErr
+		}
+
+		// If the entry is the first one
+		if iteratorResult.Offset == 0 {
+			// Verify it is a valid head entry
+			headEntryErr := iteratorResult.VerifyValidHeadEntry()
+			if headEntryErr != nil {
+				return headEntryErr
+			}
+		}
+
+		// If the current entry is the last one but it doesn't have a transaction end flag
+		if iteratorResult.EndOffset() == fileSize && !iteratorResult.HasTransactionEndFlag() {
+			// Return an unexpected end of stream error
+			return io.ErrUnexpectedEOF
+		}
+
+		return nil
+	})
 
 	// If an error occurred while appending to the index, or the file was empty
 	if err != nil || fileSize == 0 {
 		// If file ended unexpectedly, was corrupted or last entry didn't include a transaction end marker
-		if err == io.ErrUnexpectedEOF || err == ErrCorruptedEntry || fileSize == 0 {
+		if fileSize == 0 || err == io.ErrUnexpectedEOF || err == ErrCorruptedEntry || err == ErrInvalidHeadEntry {
 			// Log message
 			this.ParentServer.Logf(1, "An incomplete or corrupted transcacion found in datastore '%s'. Attempting repair..", this.Name)
 
 			// Attempt to roll back to last succesful transaction
-			repairedState, err := this.RepairIfNeeded(state)
+			repairedState, err := this.Repair(state)
 
-			// Release original file
+			// Release original file (the repaired file would have a different descriptor)
 			state.Decrement()
 
 			// If an error occurred while repairing the datastore file
@@ -178,32 +200,9 @@ func (this *DatastoreOperations) Load() (*DatastoreState, error) {
 
 	// If some error occurred while loading the head entry
 	if err != nil {
-		// If the error was because the head entry was invalid
-		if err == io.ErrUnexpectedEOF || err == ErrInvalidHeadEntry || err == ErrCorruptedEntry {
-			// At this point it would means the datastore file
-			// most likely isn't technically corrupted (since checksum verification for each of its entry passed
-			// while the index was built).
-			// It could be that it has valid entries with valid checksums but simply that it isn't correctly structured
-			// Or that it managed to become corrupted in the short timespan since the index was built
-
-			// Set a new name for the file with the ".invalid" suffix
-			newFilePath := fmt.Sprintf("%s.invalid-%d", this.FilePath, MonoUnixTimeMicro())
-
-			// Rename the file to the new name
-			renameErr := os.Rename(this.FilePath, newFilePath)
-
-			// If an error occurred while renaming the file
-			if renameErr != nil {
-				// Log a message
-				this.ParentServer.Logf(1, "Datastore '%s' cannot be opened as it has an invalid, missing or corrupted head entry. Trying to rename the file has failed due to error: %s.", this.Name, renameErr.Error())
-			} else {
-				// Log a message
-				this.ParentServer.Logf(1, "Datastore '%s' cannot be opened as it has an invalid, missing or corrupted head entry. The file has been renamed to '%s'.", this.Name, newFilePath)
-			}
-		} else { // Otherwise
-			// Log a message
-			this.ParentServer.Logf(1, "Datastore '%s' cannot be opened due to an unexpected error while trying to load its head entry: %s", this.Name, err.Error())
-		}
+		// An error here would be highly unexpected since the datastore has just been checked for corruption
+		// which included validation of its head entry.
+		this.ParentServer.Logf(1, "Datastore '%s' cannot be opened due to an unexpected error while trying to load its head entry: %s", this.Name, err.Error())
 
 		// Release file
 		state.Decrement()
@@ -212,10 +211,10 @@ func (this *DatastoreOperations) Load() (*DatastoreState, error) {
 		return nil, err
 	}
 
-	// If this is a cached datastore, cache its content
+	// If this is a cached datastore, load its content to memory
 	if this.IsCached {
 		// Load and deserialize the file's content
-		err = state.UpdateDataCache(state.File, 0, state.Index.TotalSize)
+		err = state.UpdateDataCache(state.File, 0, state.Size())
 
 		// If some error occured while trying load the file's content
 		if err != nil {
@@ -248,10 +247,10 @@ func (this *DatastoreOperations) CreateReader(state *DatastoreState, updatedAfte
 
 	// Create a reader for the range between the offset and the total
 	// size of the indexed entries (in most cases, this would be the size of the file)
-	reader = NewRangeReader(state.File, offset, int64(state.Index.TotalSize))
+	reader = NewRangeReader(state.File, offset, int64(state.Size()))
 
 	// Calculate the read size as the difference between the total size and the read start offset
-	readSize = state.Index.TotalSize - offset
+	readSize = state.Size() - offset
 
 	return
 }
@@ -266,7 +265,7 @@ func (this *DatastoreOperations) Append(transactionBytes []byte, state *Datastor
 	newState := state.Clone()
 
 	// Append the transaction to the file
-	_, err = newState.File.WriteAt(transactionBytes, int64(state.Index.TotalSize))
+	_, err = newState.File.WriteAt(transactionBytes, state.Size())
 
 	// If an error occured while writing to the file
 	if err != nil {
@@ -275,7 +274,7 @@ func (this *DatastoreOperations) Append(transactionBytes []byte, state *Datastor
 	}
 
 	// Update the index with the timestamps and offsets of the new entries
-	err = newState.Index.AppendFromBuffer(transactionBytes)
+	err = newState.Index.AppendFromBuffer(transactionBytes, nil)
 
 	// If an error occured while updating the index
 	if err != nil {
@@ -338,8 +337,7 @@ func (this *DatastoreOperations) Rewrite(transactionBytes []byte, commitTimestam
 }
 
 // Schedules a flush.
-// If 'maxDelay' is 0, it flushes immediately.
-// (this would effectively provide a "full persistence" mode).
+// If 'maxDelay' is 0, it flushes immediately (which would effectively provide a "full persistence" mode).
 func (this *DatastoreOperations) ScheduleFlushIfNeeded(state *DatastoreState, maxDelay int64) {
 	// If a flush is already scheduled
 	if state.FlushScheduler.FlushScheduled() {
@@ -390,7 +388,7 @@ func (this *DatastoreOperations) CompactIfNeeded(state *DatastoreState, minSize 
 	startTime := MonoUnixTimeMilli()
 
 	// Get the current size of the index
-	currentSize := state.Index.TotalSize
+	currentSize := state.Size()
 
 	// Continue only if current size is at least the minimum size to perform compaction checks
 	if currentSize < minSize {
@@ -531,7 +529,7 @@ func (this *DatastoreOperations) Close() (err error) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Tries rolling back the datastore to the last successful transaction.
-func (this *DatastoreOperations) RepairIfNeeded(state *DatastoreState) (*DatastoreState, error) {
+func (this *DatastoreOperations) Repair(state *DatastoreState) (*DatastoreState, error) {
 	// Get the size of the datastore file
 	originalSize, err := state.GetFileSize()
 
@@ -547,13 +545,6 @@ func (this *DatastoreOperations) RepairIfNeeded(state *DatastoreState) (*Datasto
 	// If an error occurred while checking for a truncation size
 	if err != nil {
 		// Return the error
-		return nil, err
-	}
-
-	// If the truncated datastore size is equal to the current size of the datastore
-	if repairedSize > 0 && repairedSize == originalSize {
-		// No need to repair anything
-		this.ParentServer.Logf(1, "No need to repair datastore '%s'.", this.Name)
 		return nil, err
 	}
 

@@ -7,18 +7,17 @@ import (
 
 // Datastore index entry object type
 type DatastoreIndexEntry struct {
-	offset    int64
 	timestamp int64
+	offset    int64
 }
 
 // Entry validator function type
-type DatastoreIndexEntryValidator func(iteratorResult *EntryStreamIteratorResult) error
+type IteratorResultValidator func(iteratorResult *EntryStreamIteratorResult) error
 
 // Datastore index object type
 type DatastoreIndex struct {
 	TotalSize int64
 	Entries   []DatastoreIndexEntry
-	Validator DatastoreIndexEntryValidator
 }
 
 // Construct a datastore index with no validator
@@ -26,33 +25,16 @@ func NewDatastoreIndex() *DatastoreIndex {
 	return &DatastoreIndex{
 		TotalSize: 0,
 		Entries:   []DatastoreIndexEntry{},
-		Validator: nil,
 	}
-}
-
-// Construct a datastore index with a custom validator
-func NewDatastoreIndexWithValidator(validator DatastoreIndexEntryValidator) *DatastoreIndex {
-	return &DatastoreIndex{
-		TotalSize: 0,
-		Entries:   []DatastoreIndexEntry{},
-		Validator: validator,
-	}
-}
-
-// Construct a datastore index with full checksum verification (i.e. both header and payload)
-func NewDatastoreIndexWithFullChecksumVerification() *DatastoreIndex {
-	return NewDatastoreIndexWithValidator(func(result *EntryStreamIteratorResult) error {
-		return result.VerifyAllChecksums()
-	})
 }
 
 // Append the index from a stream of serialized entries
-func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffset int64, endOffset int64) error {
+func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffset int64, endOffset int64, validator IteratorResultValidator) error {
 	// Create an entry stream iterator
 	next := NewEntryStreamIterator(source, startOffset, endOffset)
 
 	// Store the previous commit timestamp
-	previousCommitTimestamp := int64(0)
+	previousCommitTimestamp := this.LatestTimestamp()
 
 	for {
 		// Iterate to the next entry in the stream
@@ -70,16 +52,10 @@ func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffse
 			return nil
 		}
 
-		// If the current entry is the last one but it doesn't have a transaction end flag
-		if iteratorResult.EndOffset() == endOffset && !iteratorResult.HasTransactionEndFlag() {
-			// Return an unexpected end of stream error
-			return io.ErrUnexpectedEOF
-		}
-
-		// If a custom validator function is defined
-		if this.Validator != nil {
+		// If a custom validator function has been supplied
+		if validator != nil {
 			// Apply the validator to the iterator result
-			err = this.Validator(iteratorResult)
+			err = validator(iteratorResult)
 
 			// If the validator failed
 			if err != nil {
@@ -93,11 +69,14 @@ func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffse
 			// Add the offset and commit time of that entry to the index
 			this.Entries = append(
 				this.Entries,
-				DatastoreIndexEntry{this.TotalSize, iteratorResult.PrimaryHeader.CommitTime})
-		}
+				DatastoreIndexEntry{
+					timestamp: iteratorResult.PrimaryHeader.CommitTime,
+					offset: this.TotalSize,
+				})
 
-		// Update the previous commit time variable
-		previousCommitTimestamp = iteratorResult.CommitTime()
+			// Update the previous commit time variable
+			previousCommitTimestamp = iteratorResult.CommitTime()
+		}
 
 		// Add the size of the new entry to the total size of the indexed entries
 		this.TotalSize += iteratorResult.Size
@@ -105,9 +84,9 @@ func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffse
 }
 
 // Append the index from a buffer containing an empty stream
-func (this *DatastoreIndex) AppendFromBuffer(entryStreamBuffer []byte) error {
+func (this *DatastoreIndex) AppendFromBuffer(entryStreamBuffer []byte, validator IteratorResultValidator) error {
 	// Create a reader for the buffer and add from it
-	return this.AppendFromEntryStream(bytes.NewReader(entryStreamBuffer), 0, int64(len(entryStreamBuffer)))
+	return this.AppendFromEntryStream(bytes.NewReader(entryStreamBuffer), 0, int64(len(entryStreamBuffer)), validator)
 }
 
 // Find the offset for the first entry that was updated after the given time
@@ -139,6 +118,5 @@ func (this *DatastoreIndex) Clone() *DatastoreIndex {
 	return &DatastoreIndex{
 		TotalSize: this.TotalSize,
 		Entries:   this.Entries,
-		Validator: this.Validator,
 	}
 }

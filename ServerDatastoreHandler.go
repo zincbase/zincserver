@@ -502,7 +502,7 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 	datastoreSizeLimit, _ := config.GetInt64("['datastore']['limit']['maxSize']")
 
 	// Make sure the transaction wouldn't cause it to exceed this limit
-	if datastoreSizeLimit > 0 && state.Index.TotalSize+int64(len(transactionBytes)) > datastoreSizeLimit {
+	if datastoreSizeLimit > 0 && state.Size()+int64(len(transactionBytes)) > datastoreSizeLimit {
 		// Leave the writer queue
 		operations.WriterQueue.Leave(writerQueueToken)
 

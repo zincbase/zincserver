@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/pkg/profile"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
+
+	"github.com/pkg/profile"
 )
 
 var profilerSession interface {

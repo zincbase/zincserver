@@ -1,8 +1,6 @@
 # ZincServer configuration reference
 
-ZincServer's configuration is contained in a regular datastore, which is automatically created when the server is first run and stored within the file `<storagePath>/.config`. It can be viewed and edited like any other datastore. Any changes made to it would take effect immediately with no server restart needed.
-
-The web-based editor UI can be used to conveniently modify the configuration datastore, by simply pointing it to its URI e.g. `https://example.com:8000/datastore/.config` and providing the master key as an access key.
+_(For more general information regarding ZincServer's configuration structure, and instructions on setting up a server instance see the [getting started guide](https://github.com/zincbase/zincserver/blob/master/docs/Getting%20started.md))_.
 
 Configuration entry keys are node paths of the form `["<identifier>", "<identifier>", "<identifier>",..]`*. Values are JSON encoded strings and can have any one of the types `string`, `number` or `boolean` (objects and arrays are not supported by the server at the time being). This document also uses more specific types like `integer` or `float` for reference purposes.
 

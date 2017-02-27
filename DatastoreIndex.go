@@ -66,7 +66,7 @@ func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffse
 
 		// If the current entry has a commit time that's strictly greater than previous one
 		if iteratorResult.CommitTime() > previousCommitTimestamp {
-			// Add the offset and commit time of that entry to the index
+			// Add the commit time and offset of that entry to the index
 			this.Entries = append(
 				this.Entries,
 				DatastoreIndexEntry{

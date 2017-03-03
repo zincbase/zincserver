@@ -6,7 +6,7 @@ import (
 
 // The subscriber object
 type DatastoreUpdateSubscriber struct {
-	channel               chan int64
+	waitGroup             *sync.WaitGroup
 	minTimestampThreshold int64
 }
 
@@ -24,16 +24,19 @@ func NewDatastoreUpdateNotifier() *DatastoreUpdateNotifier {
 
 // Create a new notification channel for the given timestamp threshold.
 // Note this assumes that updates before or at the given timestamp have already been handled
-func (this *DatastoreUpdateNotifier) CreateUpdateNotificationChannel(minTimestampThreshold int64) (resultChannel chan int64) {
-	// Create a channel
-	resultChannel = make(chan int64, 1)
+func (this *DatastoreUpdateNotifier) CreateUpdateNotification(minTimestampThreshold int64) (waitGroup *sync.WaitGroup) {
+	// Create a wait group
+	waitGroup = &sync.WaitGroup{}
+
+	// Increment the wait group
+	waitGroup.Add(1)
 
 	// Lock this object
 	this.Lock()
 
 	// Add a new subscriber
 	this.subscribers = append(this.subscribers, &DatastoreUpdateSubscriber{
-		channel:               resultChannel,
+		waitGroup:             waitGroup,
 		minTimestampThreshold: minTimestampThreshold,
 	})
 
@@ -67,11 +70,7 @@ func (this *DatastoreUpdateNotifier) AnnounceUpdate(timestamp int64) {
 	for _, subscriber := range currentSubscribers {
 		// If the subscriber's timestamp threshold is less than the given timestamp
 		if subscriber.minTimestampThreshold < timestamp {
-			// Send a non-blocking message to that channel
-			select {
-			case subscriber.channel <- timestamp:
-			default:
-			}
+			subscriber.waitGroup.Done()
 		} else { // Otherwise
 			// Add the subscriber to the new subscriber list
 			this.subscribers = append(this.subscribers, subscriber)

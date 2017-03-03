@@ -280,9 +280,8 @@ func (this *ServerDatastoreHandler) handleGetOrHeadRequest(w http.ResponseWriter
 	if query.Get("waitUntilNonempty") == "true" && updatedAfter >= lastModifiedTime {
 		state.Decrement()
 
-		updateChannel := operations.UpdateNotifier.CreateUpdateNotificationChannel(updatedAfter)
-
-		<-updateChannel
+		waitGroup := operations.UpdateNotifier.CreateUpdateNotification(updatedAfter)
+		waitGroup.Wait()
 
 		err = this.handleGetOrHeadRequest(w, r, datastoreName, operations, query)
 		return
@@ -405,9 +404,9 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 			state.Decrement()
 
 			// Wait until data is available
-			updateChannel := operations.UpdateNotifier.CreateUpdateNotificationChannel(updatedAfter)
+			waitGroup := operations.UpdateNotifier.CreateUpdateNotification(updatedAfter)
+			waitGroup.Wait()
 
-			<-updateChannel
 			continue
 		}
 

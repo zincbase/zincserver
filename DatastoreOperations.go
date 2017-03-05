@@ -510,9 +510,18 @@ func (this *DatastoreOperations) ReplaceState(newState *DatastoreState) (err err
 	// Reset last path error
 	this.lastPathError = nil
 
+	// If the file previously existed
 	if oldState != nil {
+		// If the file was released, deleted, or replaced by a new one
 		if newState == nil || newState.File.Fd() != oldState.File.Fd() {
+			// Decrement the file counter
 			err = oldState.Decrement()
+
+			// If the file was replaced by a new one (i.e. not deleted)
+			if newState != nil {
+				// Cancel any pending flushes to it
+				oldState.FlushScheduler.Close()
+			}
 		}
 	}
 

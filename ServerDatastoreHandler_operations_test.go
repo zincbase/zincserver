@@ -63,6 +63,24 @@ var _ = Describe("Server operations", func() {
 		Expect(returnedEntries[0].Value).To(HaveLen(HeadEntryValueSize))
 	})
 
+	It("Posts entries to a non-existing datastore with 'create' flag enabled", func() {
+		client := context.GetClientForRandomDatastore("")
+		testEntries := context.GetTestEntries()
+
+		_, err := client.Post(testEntries)
+		Expect(err).NotTo(BeNil())
+
+		commitTimestamp, err := client.PostOrCreate(testEntries)
+		Expect(err).To(BeNil())
+		Expect(commitTimestamp).ToNot(BeNil())
+		Expect(commitTimestamp).To(BeNumerically(">", 0))
+
+		returnedEntries, err := client.Get(0)
+
+		Expect(err).To(BeNil())
+		ExpectEntryArraysToBeEquivalent(returnedEntries[1:], testEntries)
+	})
+
 	It("Puts, posts and gets entries after timestamp", func() {
 		client := context.GetClientForRandomDatastore("")
 		testEntries := context.GetTestEntries()

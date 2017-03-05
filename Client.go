@@ -137,15 +137,22 @@ func (this *Client) Put(entries []Entry) (commitTimestamp int64, err error) {
 	return responseObject.CommitTimestamp, nil
 }
 
-func (this *Client) PostOrPut(entries []Entry) (commitTimestamp int64, err error) {
-	commitTimestamp, err = this.Post(entries)
+func (this *Client) PostOrCreate(entries []Entry) (commitTimestamp int64, err error) {
+	serializedEntriesBytes := SerializeEntries(entries)
+	_, responseBody, err := this.Request("POST", map[string]string{"create": "true"}, bytes.NewReader(serializedEntriesBytes))
 
 	if err != nil {
-		commitTimestamp, err = this.Put(entries)
-		return
-	} else {
 		return
 	}
+
+	responseObject := PutPostResponse{}
+
+	err = json.Unmarshal(responseBody, &responseObject)
+	if err != nil {
+		return
+	}
+
+	return responseObject.CommitTimestamp, nil
 }
 
 // Sends a DELETE request for this datastore

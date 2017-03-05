@@ -226,10 +226,8 @@ func (this *ServerDatastoreHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	case "WebSocket": // This method string was converted from GET earlier, if the request had an upgrade to WebSocket
 		err = this.handleWebsocketRequest(w, r, datastoreName, operations, parsedQuery)
 		err = nil
-	case "POST":
-		err = this.handlePostRequest(w, r, datastoreName, operations, parsedQuery, config)
-	case "PUT":
-		err = this.handlePutRequest(w, r, datastoreName, operations, parsedQuery, config)
+	case "POST", "PUT":
+		err = this.handlePostOrPutRequest(w, r, datastoreName, operations, parsedQuery, config)
 	case "DELETE":
 		err = this.handleDeleteRequest(w, r, datastoreName, operations, parsedQuery)
 	default:
@@ -460,16 +458,15 @@ func (this *ServerDatastoreHandler) handleWebsocketRequest(w http.ResponseWriter
 	}
 }
 
-// Handles POST requests
-func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values, config *DatastoreConfigSnapshot) (err error) {
+func (this *ServerDatastoreHandler) handlePostOrPutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values, config *DatastoreConfigSnapshot) (err error) {
 	// Read the entire request body to memory
 	transactionBytes, err := ReadEntireStream(r.Body)
 	if err != nil {
 		return
 	}
 
-	// If the request body was empty
-	if len(transactionBytes) == 0 {
+	// If request method was POST and the request body was empty
+	if r.Method == "POST" && len(transactionBytes) == 0 {
 		// End with an error
 		endRequestWithError(w, r, http.StatusBadRequest, errors.New("No transaction data was included in the request body"))
 		return
@@ -478,30 +475,51 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 	// Wait to enter the writer queue
 	writerQueueToken := operations.WriterQueue.Enter()
 
+	// Initialize file rewrite flag
+	rewrite := r.Method == "PUT"
+
 	// Load the datastore if needed
 	state, err := operations.LoadIfNeeded(false)
 
 	// If an error ocurred while loading the datastore
-	if err != nil {
-		// Leave the writer queue
-		operations.WriterQueue.Leave(writerQueueToken)
+	if err != nil && !rewrite {
+		// If the error was a 'file not found' error
+		if _, ok := err.(*os.PathError); ok {
+			// If the enabled the "create" query argument
+			if query.Get("create") == "true" {
+				rewrite = true
+			} else {
+				// Leave the writer queue
+				operations.WriterQueue.Leave(writerQueueToken)
 
-		switch err.(type) {
-		case *os.PathError:
-			// If the error was a 'file not found' error, end with a "404 Not Found" status
-			endRequestWithError(w, r, http.StatusNotFound, nil)
-			err = nil
+				// End with a "404 Not Found" status
+				endRequestWithError(w, r, http.StatusNotFound, nil)
+				err = nil
+
+				return
+			}
+		} else {
+			// Leave the writer queue
+			operations.WriterQueue.Leave(writerQueueToken)
+
+			// Any other error would be given as an internal server error
+			return
 		}
-
-		// Any other error would be given as an internal server error
-		return
 	}
 
 	// Get the datastore size limit
 	datastoreSizeLimit, _ := config.GetInt64("['datastore']['limit']['maxSize']")
 
+	var initialDatastoreSize int64
+
+	if rewrite {
+		initialDatastoreSize = 0
+	} else {
+		initialDatastoreSize = state.Size()
+	}
+
 	// Make sure the transaction wouldn't cause it to exceed this limit
-	if datastoreSizeLimit > 0 && state.Size()+int64(len(transactionBytes)) > datastoreSizeLimit {
+	if datastoreSizeLimit > 0 && initialDatastoreSize+int64(len(transactionBytes)) > datastoreSizeLimit {
 		// Leave the writer queue
 		operations.WriterQueue.Leave(writerQueueToken)
 
@@ -520,6 +538,8 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
 	// for last entry
 	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp, datastoreEntrySizeLimit)
+
+	// If an error occurred while preparing the transaction
 	if err != nil {
 		// Leave the writer queue
 		operations.WriterQueue.Leave(writerQueueToken)
@@ -545,136 +565,60 @@ func (this *ServerDatastoreHandler) handlePostRequest(w http.ResponseWriter, r *
 		return
 	}
 
-	// Get the flush setting for this datastore
-	flushEnabled, _ := config.GetBool("['datastore']['flush']['enabled']")
+	if rewrite { // If the request was a PUT request or a POST request but the file didn't exist and creation
+				 // flag was enabled
+		// Rewrite the datastore with the given data
+		err = operations.Rewrite(transactionBytes, commitTimestamp)
 
-	// Get the maximum delay value for flushes
-	maxFlushDelay, _ := config.GetInt64("['datastore']['flush']['maxDelay']")
+		// If an error occured while commiting the transaction
+		if err != nil {
+			// Leave the writer queue
+			operations.WriterQueue.Leave(writerQueueToken)
 
-	// Append the processed transaction bytes to the datastore
-	err = operations.Append(transactionBytes, state, commitTimestamp, flushEnabled, maxFlushDelay)
-
-	// If an error occured while appending the transaction
-	if err != nil {
-		// Leave the writer queue
-		operations.WriterQueue.Leave(writerQueueToken)
-
-		// Otherwise, any other error would be considered an internal server error
-		return
-	}
-
-	// Read related configuration options for compaction
-	compactionEnabled, _ := config.GetBool("['datastore']['compaction']['enabled']")
-
-	if compactionEnabled == true {
-		compactionMinSize, err1 := config.GetInt64("['datastore']['compaction']['minSize']")
-		compactionMinGrowthRatio, err2 := config.GetFloat64("['datastore']['compaction']['minGrowthRatio']")
-		compactionMinUnusedSizeRatio, err3 := config.GetFloat64("['datastore']['compaction']['minUnusedSizeRatio']")
-
-		if err1 == nil && err2 == nil && err3 == nil {
-			// Perform a compaction check and compact if needed
-			_, err = operations.CompactIfNeeded(operations.State, compactionMinSize, compactionMinGrowthRatio, compactionMinUnusedSizeRatio)
-
-			// If an error occurred while compacting
-			if err != nil {
-				// Leave the writer queue
-				operations.WriterQueue.Leave(writerQueueToken)
-
-				// Return the error
-				return
-			}
+			// Otherwise, any error would be considered an internal server error
+			return
 		}
-	}
+	} else { // Otherwise, if it was a regular POST request
+		// Get the flush setting for this datastore
+		flushEnabled, _ := config.GetBool("['datastore']['flush']['enabled']")
 
-	// Leave the writer queue
-	operations.WriterQueue.Leave(writerQueueToken)
+		// Get the maximum delay value for flushes
+		maxFlushDelay, _ := config.GetInt64("['datastore']['flush']['maxDelay']")
 
-	// Set the response content type to JSON
-	w.Header().Set("Content-Type", "application/json")
-	// Write the header with a 200 OK status
-	w.WriteHeader(http.StatusOK)
-	// Write the commit timestamp to the response body within a JSON object
-	_, err = io.WriteString(w, fmt.Sprintf(`{"commitTimestamp": %d}`, commitTimestamp))
+		// Append the processed transaction bytes to the datastore
+		err = operations.Append(transactionBytes, state, commitTimestamp, flushEnabled, maxFlushDelay)
 
-	// Any error here would become an internal server error
-	return
-}
+		// If an error occured while appending the transaction
+		if err != nil {
+			// Leave the writer queue
+			operations.WriterQueue.Leave(writerQueueToken)
 
-// Handles PUT requests
-func (this *ServerDatastoreHandler) handlePutRequest(w http.ResponseWriter, r *http.Request, datastoreName string, operations *DatastoreOperations, query url.Values, config *DatastoreConfigSnapshot) (err error) {
-	// Read the entire request body to memory
-	transactionBytes, err := ReadEntireStream(r.Body)
-	if err != nil {
-		return
-	}
-
-	// Wait to enter the writer queue
-	writerQueueToken := operations.WriterQueue.Enter()
-
-	// Get the datastore size limit
-	datastoreSizeLimit, _ := config.GetInt64("['datastore']['limit']['maxSize']")
-
-	// Make sure the transaction wouldn't cause it to exceed this limit
-	if datastoreSizeLimit > 0 && int64(len(transactionBytes)) > datastoreSizeLimit {
-		// Leave the writer queue
-		operations.WriterQueue.Leave(writerQueueToken)
-
-		endRequestWithError(w, r, http.StatusForbidden, ErrDatastoreSizeLimitExceeded{fmt.Sprintf("Datastore '%s' is limited to a maximum size of %d bytes", operations.Name, datastoreSizeLimit)})
-		err = nil
-
-		return
-	}
-
-	// Get the entry size limit
-	datastoreEntrySizeLimit, _ := config.GetInt64("['datastore']['limit']['maxEntrySize']")
-
-	// Try to load the existing datastore and ignore any error
-	// (this is only done to get the latest ensure the transaction timestamp for the rewritten datastore
-	//  is always strictly greater than the latest one)
-	state, _ := operations.LoadIfNeeded(false)
-
-	// Get commit timestamp (note the state argument passed may be nil)
-	commitTimestamp := operations.GetCollisionFreeTimestamp(state)
-
-	// Validate and prepare transaction: rewrite its commit timestamps and ensure transaction end mark
-	// for last entry
-	err = ValidateAndPrepareTransaction(transactionBytes, commitTimestamp, datastoreEntrySizeLimit)
-
-	// If the validation failed
-	if err != nil {
-		// Leave the writer queue
-		operations.WriterQueue.Leave(writerQueueToken)
-
-		// Handle an unexpected end of stream error
-		if err == io.ErrUnexpectedEOF {
-			endRequestWithError(w, r, http.StatusBadRequest, errors.New("An unexpected end of stream was encountered while validating the given transaction"))
-			err = nil
-		} else { // Handle other errors
-			switch err.(type) {
-			// Check for entry rejected errors and respond with a bad request status
-			case ErrEntryRejected:
-				endRequestWithError(w, r, http.StatusBadRequest, err)
-				err = nil
-
-			// Check for datastore too large errors and respond with a forbidden request status
-			case ErrDatastoreEntrySizeLimitExceeded:
-				endRequestWithError(w, r, http.StatusForbidden, err)
-				err = nil
-			}
+			// Otherwise, any other error would be considered an internal server error
+			return
 		}
 
-		return
-	}
+		// Read related configuration options for compaction
+		compactionEnabled, _ := config.GetBool("['datastore']['compaction']['enabled']")
 
-	// Rewrite the datastore with the given data
-	err = operations.Rewrite(transactionBytes, commitTimestamp)
+		if compactionEnabled == true {
+			compactionMinSize, err1 := config.GetInt64("['datastore']['compaction']['minSize']")
+			compactionMinGrowthRatio, err2 := config.GetFloat64("['datastore']['compaction']['minGrowthRatio']")
+			compactionMinUnusedSizeRatio, err3 := config.GetFloat64("['datastore']['compaction']['minUnusedSizeRatio']")
 
-	// If an error occured while commiting the transaction
-	if err != nil {
-		operations.WriterQueue.Leave(writerQueueToken)
+			if err1 == nil && err2 == nil && err3 == nil {
+				// Perform a compaction check and compact if needed
+				_, err = operations.CompactIfNeeded(operations.State, compactionMinSize, compactionMinGrowthRatio, compactionMinUnusedSizeRatio)
 
-		// Otherwise, any error would be considered an internal server error
-		return
+				// If an error occurred while compacting
+				if err != nil {
+					// Leave the writer queue
+					operations.WriterQueue.Leave(writerQueueToken)
+
+					// Return the error
+					return
+				}
+			}
+		}
 	}
 
 	// Leave the writer queue

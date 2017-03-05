@@ -105,7 +105,7 @@ func (this *ServerTestContext) PutDatastoreSettings(datastoreName string, settin
 	}
 
 	configClient := this.GetConfigClient(datastoreName, accessKey)
-	_, err = configClient.PostOrPut(settingEntries)
+	_, err = configClient.PostOrCreate(settingEntries)
 
 	return
 }

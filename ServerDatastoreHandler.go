@@ -481,12 +481,13 @@ func (this *ServerDatastoreHandler) handlePostOrPutRequest(w http.ResponseWriter
 	// Load the datastore if needed
 	state, err := operations.LoadIfNeeded(false)
 
-	// If an error ocurred while loading the datastore
+	// If an error ocurred while loading the datastore and the method was POST
 	if err != nil && !rewrite {
 		// If the error was a 'file not found' error
 		if _, ok := err.(*os.PathError); ok {
-			// If the enabled the "create" query argument
+			// If the "create" query argument was set to 'true'
 			if query.Get("create") == "true" {
+				// Set the rest of the request to behave like PUT
 				rewrite = true
 			} else {
 				// Leave the writer queue
@@ -502,7 +503,7 @@ func (this *ServerDatastoreHandler) handlePostOrPutRequest(w http.ResponseWriter
 			// Leave the writer queue
 			operations.WriterQueue.Leave(writerQueueToken)
 
-			// Any other error would be given as an internal server error
+			// Any other error would be seen as an internal server error
 			return
 		}
 	}
@@ -510,6 +511,7 @@ func (this *ServerDatastoreHandler) handlePostOrPutRequest(w http.ResponseWriter
 	// Get the datastore size limit
 	datastoreSizeLimit, _ := config.GetInt64("['datastore']['limit']['maxSize']")
 
+	// Get the current datastore size to calculate write limit
 	var initialDatastoreSize int64
 
 	if rewrite {

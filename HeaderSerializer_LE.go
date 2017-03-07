@@ -12,14 +12,14 @@ import (
 // Serialization
 ////////////////////////////////////////////////////////////////////////////////
 
-func SerializePrimaryHeader(targetSlice []byte, header *EntryPrimaryHeader) {
-	*(*EntryPrimaryHeader)(unsafe.Pointer(&targetSlice[0])) = *header
+func SerializeHeader(header *EntryHeader, targetSlice []byte) {
+	*(*EntryHeader)(unsafe.Pointer(&targetSlice[0])) = *header
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Deserialization
 ////////////////////////////////////////////////////////////////////////////////
 
-func DeserializePrimaryHeader(primaryHeaderBytes []byte) *EntryPrimaryHeader {
-	return (*EntryPrimaryHeader)(unsafe.Pointer(&primaryHeaderBytes[0]))
+func DeserializeHeader(headerBytes []byte) *EntryHeader {
+	return (*EntryHeader)(unsafe.Pointer(&headerBytes[0]))
 }

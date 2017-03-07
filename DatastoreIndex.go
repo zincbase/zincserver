@@ -70,7 +70,7 @@ func (this *DatastoreIndex) AppendFromEntryStream(source io.ReaderAt, startOffse
 			this.Entries = append(
 				this.Entries,
 				DatastoreIndexEntry{
-					timestamp: iteratorResult.PrimaryHeader.CommitTime,
+					timestamp: iteratorResult.Header.CommitTime,
 					offset: this.TotalSize,
 				})
 

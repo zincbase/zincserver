@@ -12,12 +12,12 @@ var _ = Describe("EntryStreamRepairer", func() {
 	It("Returns a truncated size for an incomplete datastore stream, for a datastore that was never compacted", func() {
 		testEntries := []*Entry{
 			CreateHeadEntry(&HeadEntryValue{}, 1234),
-			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Secondary header 2"), []byte("Key2"), []byte("Value2")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Secondary header 3"), []byte("Key1"), []byte("Value3")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Secondary header 4"), []byte("Key1"), []byte("Value4")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Secondary header 5"), []byte("Key2"), []byte("Value5")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Secondary header 6"), []byte("Key3"), []byte("Value6")},
+			&Entry{&EntryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryHeader{CommitTime: 3}, []byte("Key2"), []byte("Value2")},
+			&Entry{&EntryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value3")},
+			&Entry{&EntryHeader{CommitTime: 7}, []byte("Key1"), []byte("Value4")},
+			&Entry{&EntryHeader{CommitTime: 7}, []byte("Key2"), []byte("Value5")},
+			&Entry{&EntryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Key3"), []byte("Value6")},
 		}
 
 		serializedEntries := make([][]byte, len(testEntries))
@@ -65,12 +65,12 @@ var _ = Describe("EntryStreamRepairer", func() {
 	It("Returns a truncated size for an incomplete datastore stream, for a datastore that was compacted before", func() {
 		testEntries := []*Entry{
 			CreateHeadEntry(&HeadEntryValue{LastCompactionTime: 6}, 1234),
-			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3}, []byte("Secondary header 2"), []byte("Key2"), []byte("Value2")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Secondary header 3"), []byte("Key1"), []byte("Value3")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Secondary header 4"), []byte("Key1"), []byte("Value4")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7}, []byte("Secondary header 5"), []byte("Key2"), []byte("Value5")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Secondary header 6"), []byte("Key3"), []byte("Value6")},
+			&Entry{&EntryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryHeader{CommitTime: 3}, []byte("Key2"), []byte("Value2")},
+			&Entry{&EntryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value3")},
+			&Entry{&EntryHeader{CommitTime: 7}, []byte("Key1"), []byte("Value4")},
+			&Entry{&EntryHeader{CommitTime: 7}, []byte("Key2"), []byte("Value5")},
+			&Entry{&EntryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Key3"), []byte("Value6")},
 		}
 
 		serializedEntries := make([][]byte, len(testEntries))
@@ -118,12 +118,12 @@ var _ = Describe("EntryStreamRepairer", func() {
 	It("Returns a correct truncated size for a randomly corrupted entry stream", func() {
 		testEntries := []*Entry{
 			CreateHeadEntry(&HeadEntryValue{}, 1234),
-			&Entry{&EntryPrimaryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Secondary header 1"), []byte("Key1"), []byte("Value1")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Secondary header 2"), []byte("Key2"), []byte("Value2")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Secondary header 3"), []byte("Key1"), []byte("Value3")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte("Secondary header 4"), []byte("Key1"), []byte("Value4")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte("Secondary header 5"), []byte("Key2"), []byte("Value5")},
-			&Entry{&EntryPrimaryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Secondary header 6"), []byte("Key3"), []byte("Value6")},
+			&Entry{&EntryHeader{CommitTime: 2, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value1")},
+			&Entry{&EntryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Key2"), []byte("Value2")},
+			&Entry{&EntryHeader{CommitTime: 3, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value3")},
+			&Entry{&EntryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte("Key1"), []byte("Value4")},
+			&Entry{&EntryHeader{CommitTime: 7, Flags: Flag_TransactionEnd}, []byte("Key2"), []byte("Value5")},
+			&Entry{&EntryHeader{CommitTime: 13, Flags: Flag_TransactionEnd}, []byte("Key3"), []byte("Value6")},
 		}
 
 		serializedEntries := make([][]byte, len(testEntries))

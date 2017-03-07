@@ -15,7 +15,7 @@ var profilerSession interface {
 	Stop()
 }
 
-const versionString = "0.3.0"
+const versionString = "0.4.0"
 
 func main() {
 	handleOsSignals()

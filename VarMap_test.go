@@ -65,11 +65,11 @@ var _ = Describe("VarMap", func() {
 
 	It("Appends JSON entries", func() {
 		jsonEntries := []Entry{
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 1"), []byte(`"Key1"`), []byte(`"Hello world!"`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 2"), []byte(`"Key2"`), []byte(`6543.21`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 3"), []byte(`"Key3"`), []byte(`true`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 4"), []byte(`"Key4"`), []byte(`false`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 5"), []byte(`"Key5"`), []byte(`null`)},
+			Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key1"`), []byte(`"Hello world!"`)},
+			Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key2"`), []byte(`6543.21`)},
+			Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key3"`), []byte(`true`)},
+			Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key4"`), []byte(`false`)},
+			Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key5"`), []byte(`null`)},
 		}
 
 		varMap := NewEmptyVarMap()
@@ -108,9 +108,9 @@ var _ = Describe("VarMap", func() {
 
 	It("Ignores non-JSON entries", func() {
 		nonJsonEntries := []Entry{
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_Binary, Flags: Flag_TransactionEnd}, []byte("Secondary Header 1"), []byte(`"Key1"`), []byte(`"Hello world!"`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 2"), []byte(`"Key2"`), []byte(`1111.21`)},
-			Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_UTF8, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 4"), []byte(`"Key3"`), []byte(`6543.21`)},
+			Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_Binary, Flags: Flag_TransactionEnd}, []byte(`"Key1"`), []byte(`"Hello world!"`)},
+			Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key2"`), []byte(`1111.21`)},
+			Entry{&EntryHeader{KeyFormat: DataFormat_UTF8, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key3"`), []byte(`6543.21`)},
 		}
 
 		varMap := NewEmptyVarMap()

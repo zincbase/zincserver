@@ -6,84 +6,88 @@ import (
 
 func Benchmark_HeaderSerializer(bench *testing.B) {
 	bench.Run("Serialization (architecture dependant implementation)", func(bench *testing.B) {
-		testHeader := &EntryPrimaryHeader{
-			TotalSize:           33452341,
-			UpdateTime:          345343452123,
-			CommitTime:          345343452345,
-			KeySize:             3945,
-			KeyFormat:           54,
-			ValueFormat:         23,
-			EncryptionMethod:    34,
-			Flags:               41,
-			SecondaryHeaderSize: 5436,
+		testHeader := &EntryHeader{
+			TotalSize:        33452341,
+			HeaderVersion:    4321,
+			KeySize:          3945,
+			KeyFormat:        54,
+			ValueFormat:      23,
+			EncryptionMethod: 34,
+			Flags:            41,
+			UpdateTime: 345343452123,
+			CommitTime: 345343452345,
 		}
-		serializedHeader := make([]byte, PrimaryHeaderSize)
+
+		serializedHeader := make([]byte, HeaderSize)
 
 		bench.ResetTimer()
 		for i := 0; i < bench.N; i++ {
-			SerializePrimaryHeader(serializedHeader, testHeader)
+			SerializeHeader(testHeader, serializedHeader)
 		}
 	})
 
 	bench.Run("Deserialization (architecture dependant implementation)", func(bench *testing.B) {
-		testHeader := &EntryPrimaryHeader{
-			TotalSize:           33452341,
-			UpdateTime:          345343452123,
-			CommitTime:          345343452345,
-			KeySize:             3945,
-			KeyFormat:           54,
-			ValueFormat:         23,
-			EncryptionMethod:    34,
-			Flags:               41,
-			SecondaryHeaderSize: 5436,
+		testHeader := &EntryHeader{
+			TotalSize:        33452341,
+			HeaderVersion:    4321,
+			KeySize:          3945,
+			KeyFormat:        54,
+			ValueFormat:      23,
+			EncryptionMethod: 34,
+			Flags:            41,
+			UpdateTime: 345343452123,
+			CommitTime: 345343452345,
 		}
-		serializedHeader := make([]byte, PrimaryHeaderSize)
-		SerializePrimaryHeader(serializedHeader, testHeader)
+
+		serializedHeader := make([]byte, HeaderSize)
+		SerializeHeader(testHeader, serializedHeader)
 
 		bench.ResetTimer()
 		for i := 0; i < bench.N; i++ {
-			_ = DeserializePrimaryHeader(serializedHeader)
+			_ = DeserializeHeader(serializedHeader)
 		}
 	})
 
 	bench.Run("Serialization (slow implementation for BE architectures)", func(bench *testing.B) {
-		testHeader := &EntryPrimaryHeader{
-			TotalSize:           33452341,
-			UpdateTime:          345343452123,
-			CommitTime:          345343452345,
-			KeySize:             3945,
-			KeyFormat:           54,
-			ValueFormat:         23,
-			EncryptionMethod:    34,
-			Flags:               41,
-			SecondaryHeaderSize: 5436,
+		testHeader := &EntryHeader{
+			TotalSize:        33452341,
+			HeaderVersion:    4321,
+			KeySize:          3945,
+			KeyFormat:        54,
+			ValueFormat:      23,
+			EncryptionMethod: 34,
+			Flags:            41,
+			UpdateTime: 345343452123,
+			CommitTime: 345343452345,
 		}
-		serializedHeader := make([]byte, PrimaryHeaderSize)
+
+		serializedHeader := make([]byte, HeaderSize)
 
 		bench.ResetTimer()
 		for i := 0; i < bench.N; i++ {
-			SerializePrimaryHeader_Slow(serializedHeader, testHeader)
+			SerializeHeader_Slow(testHeader, serializedHeader)
 		}
 	})
 
 	bench.Run("Deserialization (slow implementation for BE architectures)", func(bench *testing.B) {
-		testHeader := &EntryPrimaryHeader{
-			TotalSize:           33452341,
-			UpdateTime:          345343452123,
-			CommitTime:          345343452345,
-			KeySize:             3945,
-			KeyFormat:           54,
-			ValueFormat:         23,
-			EncryptionMethod:    34,
-			Flags:               41,
-			SecondaryHeaderSize: 5436,
+		testHeader := &EntryHeader{
+			TotalSize:        33452341,
+			HeaderVersion:    4321,
+			KeySize:          3945,
+			KeyFormat:        54,
+			ValueFormat:      23,
+			EncryptionMethod: 34,
+			Flags:            41,
+			UpdateTime: 345343452123,
+			CommitTime: 345343452345,
 		}
-		serializedHeader := make([]byte, PrimaryHeaderSize)
-		SerializePrimaryHeader_Slow(serializedHeader, testHeader)
+
+		serializedHeader := make([]byte, HeaderSize)
+		SerializeHeader_Slow(testHeader, serializedHeader)
 
 		bench.ResetTimer()
 		for i := 0; i < bench.N; i++ {
-			_ = DeserializePrimaryHeader_Slow(serializedHeader)
+			_ = DeserializeHeader_Slow(serializedHeader)
 		}
 	})
 }

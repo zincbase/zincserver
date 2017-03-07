@@ -70,7 +70,7 @@ var _ = Describe("Server error handling", func() {
 		client := context.GetClientForRandomDatastore("")
 
 		_, err := client.Put([]Entry{
-			Entry{nil, []byte{}, []byte{}, []byte{1, 2, 3}},
+			Entry{nil, []byte{}, []byte{1, 2, 3}},
 		})
 
 		Expect(err).NotTo(BeNil())
@@ -84,7 +84,7 @@ var _ = Describe("Server error handling", func() {
 		Expect(err).To(BeNil())
 
 		_, err = client.Post([]Entry{
-			Entry{nil, []byte{}, []byte{}, []byte{1, 2, 3}},
+			Entry{nil, []byte{}, []byte{1, 2, 3}},
 		})
 
 		Expect(err).NotTo(BeNil())
@@ -95,7 +95,7 @@ var _ = Describe("Server error handling", func() {
 		client := context.GetClientForRandomDatastore("")
 
 		var getEntryWithUpdateTime = func(updateTime int64) Entry {
-			return Entry{&EntryPrimaryHeader{UpdateTime: updateTime}, []byte{}, []byte("Hello"), []byte{1, 2, 3}}
+			return Entry{&EntryHeader{UpdateTime: updateTime}, []byte("Hello"), []byte{1, 2, 3}}
 		}
 
 		_, err := client.Put([]Entry{})
@@ -189,7 +189,7 @@ var _ = Describe("Server error handling", func() {
 	It("Rejects access keys with invalid characters", func() {
 		invalidAccessKey := hex.EncodeToString(RandomBytes(16))
 		invalidAccessKey = invalidAccessKey[:5] + string('X') + invalidAccessKey[6:]
-		
+
 		Expect(len(invalidAccessKey)).To(Equal(32))
 
 		invalidKeyClient := NewClient(context.hostURL, RandomWordString(12), invalidAccessKey)

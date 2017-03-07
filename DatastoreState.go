@@ -83,7 +83,7 @@ func (this *DatastoreState) LoadHeadEntry() error {
 	this.HeadEntryValue = DeserializeHeadEntryValue(value)
 
 	// Store the creation time in its object
-	this.CreationTime = iterationResult.PrimaryHeader.CommitTime
+	this.CreationTime = iterationResult.Header.CommitTime
 
 	return nil
 }

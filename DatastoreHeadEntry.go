@@ -8,7 +8,7 @@ import (
 
 const DatastoreVersion = 1
 const HeadEntrySize = 512
-const HeadEntryValueSize = HeadEntrySize - PrimaryHeaderSize
+const HeadEntryValueSize = HeadEntrySize - HeaderSize
 
 type HeadEntryValue struct {
 	Version                       int64
@@ -44,12 +44,11 @@ func CreateHeadEntry(value *HeadEntryValue, timestamp int64) *Entry {
 
 	// Return an entry with the timestamp and serialized value
 	return &Entry{
-		PrimaryHeader:        &EntryPrimaryHeader{
+		Header:        &EntryHeader{
 			UpdateTime: timestamp,
 			CommitTime: timestamp,
 			Flags: Flag_TransactionEnd | Flag_HeadEntry,
 		},
-		SecondaryHeaderBytes: []byte{},
 		Key:                  []byte{},
 		Value:                SerializeHeadEntryValue(value),
 	}

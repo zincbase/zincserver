@@ -14,13 +14,13 @@ var _ = Describe("DatastoreKeyIndex", func() {
 
 	BeforeSuite(func() {
 		serializedEntries = [][]byte{
-			SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 1}, nil, []byte("Key1"), []byte("a")}),
-			SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 3}, nil, []byte("Key2"), []byte("")}),
-			SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 3}, nil, []byte("Key1"), []byte("abcd")}),
-			SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 4}, nil, []byte("Key1"), []byte("efg")}),
-			SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 6}, nil, []byte("Key2"), []byte("hijkl")}),
-			SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 7}, nil, []byte("Key3"), []byte("m")}),
-			SerializeEntry(&Entry{&EntryPrimaryHeader{CommitTime: 9}, nil, []byte("Key3"), []byte("nopqrst")}),
+			SerializeEntry(&Entry{&EntryHeader{CommitTime: 1}, []byte("Key1"), []byte("a")}),
+			SerializeEntry(&Entry{&EntryHeader{CommitTime: 3}, []byte("Key2"), []byte("")}),
+			SerializeEntry(&Entry{&EntryHeader{CommitTime: 3}, []byte("Key1"), []byte("abcd")}),
+			SerializeEntry(&Entry{&EntryHeader{CommitTime: 4}, []byte("Key1"), []byte("efg")}),
+			SerializeEntry(&Entry{&EntryHeader{CommitTime: 6}, []byte("Key2"), []byte("hijkl")}),
+			SerializeEntry(&Entry{&EntryHeader{CommitTime: 7}, []byte("Key3"), []byte("m")}),
+			SerializeEntry(&Entry{&EntryHeader{CommitTime: 9}, []byte("Key3"), []byte("nopqrst")}),
 		}
 
 		serializedEntryOffsets = make([]int64, len(serializedEntries))

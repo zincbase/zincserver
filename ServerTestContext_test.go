@@ -72,11 +72,11 @@ func (this *ServerTestContext) GetRandomAccessKey() (key string, keyHash string)
 
 func (this *ServerTestContext) GetTestEntries() []Entry {
 	return []Entry{
-		Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 1"), []byte(`"Key1"`), []byte(`"Value1"`)},
-		Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 2"), []byte(`"Key2"`), []byte(`"Value2"`)},
-		Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 3"), []byte(`"Key3"`), []byte(`"Value3"`)},
-		Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 4"), []byte(`"Key4"`), []byte(`"Value4"`)},
-		Entry{&EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte("Secondary Header 5"), []byte(`"Key5"`), []byte(`"Value5"`)},
+		Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key1"`), []byte(`"Value1"`)},
+		Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key2"`), []byte(`"Value2"`)},
+		Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key3"`), []byte(`"Value3"`)},
+		Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key4"`), []byte(`"Value4"`)},
+		Entry{&EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON, Flags: Flag_TransactionEnd}, []byte(`"Key5"`), []byte(`"Value5"`)},
 	}
 }
 
@@ -97,8 +97,7 @@ func (this *ServerTestContext) PutDatastoreSettings(datastoreName string, settin
 
 	for key, value := range settingMap {
 		settingEntries = append(settingEntries, Entry{
-			PrimaryHeader:        &EntryPrimaryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON},
-			SecondaryHeaderBytes: nil,
+			Header:        &EntryHeader{KeyFormat: DataFormat_JSON, ValueFormat: DataFormat_JSON},
 			Key:                  []byte(key),
 			Value:                []byte(value),
 		})

@@ -28,8 +28,8 @@ var _ = Describe("DatastoreHeadEntry", func() {
 		Expect(iteratorResult.KeySize()).To(EqualNumber(0))
 		Expect(iteratorResult.ValueSize()).To(EqualNumber(HeadEntryValueSize))
 		Expect(iteratorResult.HasTransactionEndFlag()).To(BeTrue())
-		Expect(iteratorResult.PrimaryHeader.CommitTime).To(EqualNumber(654321))
-		Expect(iteratorResult.PrimaryHeader.UpdateTime).To(EqualNumber(654321))
+		Expect(iteratorResult.Header.CommitTime).To(EqualNumber(654321))
+		Expect(iteratorResult.Header.UpdateTime).To(EqualNumber(654321))
 
 		value, err := iteratorResult.ReadValue()
 

@@ -11,16 +11,15 @@ import (
 var _ = Describe("EntrySerializer", func() {
 	It("Serializes and deserializes an entry", func() {
 		testEntry := Entry{
-			PrimaryHeader: &EntryPrimaryHeader{
-				UpdateTime:  23422523422341542,
-				CommitTime:  23422523422343423,
+			Header: &EntryHeader{
 				KeyFormat:   DataFormat_UTF8,
 				ValueFormat: DataFormat_Binary,
 				Flags:       Flag_TransactionEnd,
-				PrimaryHeaderChecksum: 3316190138, // Bogus checksum for testing only
+				UpdateTime:  23422523422341542,
+				CommitTime:  23422523422343423,
+				HeaderChecksum: 3316190138, // Bogus checksum for testing only
 				PayloadChecksum:       2042592394, // Bogus checksum for testing only
 			},
-			SecondaryHeaderBytes: []byte(RandomBytes(20)),
 			Key:                  []byte(RandomWordString(10)),
 			Value:                []byte(RandomBytes(50)),
 		}
@@ -33,16 +32,15 @@ var _ = Describe("EntrySerializer", func() {
 
 	It("Adds checksums that are verified correctly", func() {
 		testEntry := Entry{
-			PrimaryHeader: &EntryPrimaryHeader{
-				UpdateTime:  23422523422341542,
-				CommitTime:  23422523422343423,
+			Header: &EntryHeader{
 				KeyFormat:   DataFormat_UTF8,
 				ValueFormat: DataFormat_Binary,
 				Flags:       Flag_TransactionEnd,
-				PrimaryHeaderChecksum: 0,
+				UpdateTime:  23422523422341542,
+				CommitTime:  23422523422343423,
+				HeaderChecksum: 0,
 				PayloadChecksum:       0,
 			},
-			SecondaryHeaderBytes: []byte(RandomBytes(20)),
 			Key:                  []byte(RandomWordString(10)),
 			Value:                []byte(RandomBytes(50)),
 		}
@@ -53,18 +51,18 @@ var _ = Describe("EntrySerializer", func() {
 		Expect(binary.LittleEndian.Uint32(serializedEntry[32:36])).To(BeNumerically(">", 0))
 		Expect(binary.LittleEndian.Uint32(serializedEntry[36:40])).To(BeNumerically(">", 0))
 
-		Expect(VerifyPrimaryHeaderChecksum(serializedEntry)).To(BeNil())
+		Expect(VerifyHeaderChecksum(serializedEntry)).To(BeNil())
 		Expect(VerifyPayloadChecksum(serializedEntry, bytes.NewReader(serializedEntry[40:]))).To(BeNil())
 	})
 
 	It("Compacts a series of entries", func() {
 		entries := []Entry{
-			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key1"), Value: []byte("Value1")},
-			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key2"), Value: []byte("Value2")},
-			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key1"), Value: []byte("Value3")},
-			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key3"), Value: []byte("Value4")},
-			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key3"), Value: []byte("Value5")},
-			Entry{PrimaryHeader: nil, SecondaryHeaderBytes: nil, Key: []byte("Key4"), Value: []byte("Value6")},
+			Entry{Header: nil, Key: []byte("Key1"), Value: []byte("Value1")},
+			Entry{Header: nil, Key: []byte("Key2"), Value: []byte("Value2")},
+			Entry{Header: nil, Key: []byte("Key1"), Value: []byte("Value3")},
+			Entry{Header: nil, Key: []byte("Key3"), Value: []byte("Value4")},
+			Entry{Header: nil, Key: []byte("Key3"), Value: []byte("Value5")},
+			Entry{Header: nil, Key: []byte("Key4"), Value: []byte("Value6")},
 		}
 
 		Expect(CompactEntries(entries)).To(Equal([]Entry{entries[1], entries[2], entries[4], entries[5]}))

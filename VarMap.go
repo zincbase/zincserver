@@ -235,7 +235,7 @@ func (this *VarMap) SetFromJsonKeyAndValue(jsonKeyBytes []byte, jsonValueBytes [
 
 func (this *VarMap) AppendJsonEntries(jsonEntries []Entry) (err error) {
 	for _, entry := range jsonEntries {
-		if entry.PrimaryHeader.KeyFormat != DataFormat_JSON || entry.PrimaryHeader.ValueFormat != DataFormat_JSON {
+		if entry.Header.KeyFormat != DataFormat_JSON || entry.Header.ValueFormat != DataFormat_JSON {
 			continue
 		}
 

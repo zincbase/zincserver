@@ -24,15 +24,15 @@ func NewEntryStreamIterator(source io.ReaderAt, startOffset int64, endOffset int
 		if readOffset == endOffset {
 			// Return an empty result with no error
 			return nil, nil
-			// Otherwise if the primary header end offset is greater than the streams's end offset
-		} else if readOffset+PrimaryHeaderSize > endOffset {
+			// Otherwise if the header end offset is greater than the streams's end offset
+		} else if readOffset+HeaderSize > endOffset {
 			// Return an empty result with an unexpected end of stream error
 			return nil, io.ErrUnexpectedEOF
 		}
 
-		// Parse the primary header
-		primaryHeaderBytes := make([]byte, PrimaryHeaderSize)
-		_, err := source.ReadAt(primaryHeaderBytes, readOffset)
+		// Parse the header
+		headerBytes := make([]byte, HeaderSize)
+		_, err := source.ReadAt(headerBytes, readOffset)
 
 		// If an error occurred when parsing the header
 		if err != nil {
@@ -46,16 +46,16 @@ func NewEntryStreamIterator(source io.ReaderAt, startOffset int64, endOffset int
 			}
 		}
 
-		// Deserialize the primary header
-		primaryHeader := DeserializePrimaryHeader(primaryHeaderBytes)
+		// Deserialize the header
+		header := DeserializeHeader(headerBytes)
 
 		// Create the iterator result object
 		iteratorResult := &EntryStreamIteratorResult{
 			source:             source,
 			Offset:             readOffset,
-			Size:               primaryHeader.TotalSize,
-			PrimaryHeaderBytes: primaryHeaderBytes,
-			PrimaryHeader:      primaryHeader,
+			Size:               header.TotalSize,
+			HeaderBytes: headerBytes,
+			Header:      header,
 		}
 
 		// If the expected end offset of the entry is greater than the end offset of the stream
@@ -80,17 +80,10 @@ type EntryStreamIteratorResult struct {
 	Offset int64
 	// The entry's size
 	Size int64
-	// The primary header
-	PrimaryHeader *EntryPrimaryHeader
-	// The serialized primary header
-	PrimaryHeaderBytes []byte
-}
-
-// Read the secondary header's bytes
-func (this *EntryStreamIteratorResult) ReadSecondaryHeaderBytes() (secondaryHeaderBytes []byte, err error) {
-	secondaryHeaderBytes = make([]byte, this.SecondaryHeaderSize())
-	_, err = this.source.ReadAt(secondaryHeaderBytes, this.SecondaryHeaderOffset())
-	return
+	// The entry's header
+	Header *EntryHeader
+	// The entry's header (serialized)
+	HeaderBytes []byte
 }
 
 // Read the key as a byte slice
@@ -126,29 +119,19 @@ func (this *EntryStreamIteratorResult) ReadKeyAndValue() (key []byte, value []by
 	return
 }
 
-// Create a reader for the payload (everything past the primary header)
+// Create a reader for the payload (everything past the header)
 func (this *EntryStreamIteratorResult) CreatePayloadReader() io.Reader {
-	return NewRangeReader(this.source, this.SecondaryHeaderOffset(), this.EndOffset())
-}
-
-// Get the stream offset of the secondary header
-func (this *EntryStreamIteratorResult) SecondaryHeaderOffset() int64 {
-	return this.Offset + int64(PrimaryHeaderSize)
-}
-
-// Get the size of the secondary header
-func (this *EntryStreamIteratorResult) SecondaryHeaderSize() int64 {
-	return int64(this.PrimaryHeader.SecondaryHeaderSize)
+	return NewRangeReader(this.source, this.KeyOffset(), this.EndOffset())
 }
 
 // Get the stream offset of the key
 func (this *EntryStreamIteratorResult) KeyOffset() int64 {
-	return this.SecondaryHeaderOffset() + int64(this.PrimaryHeader.SecondaryHeaderSize)
+	return this.Offset + HeaderSize
 }
 
 // Get the size of the key
 func (this *EntryStreamIteratorResult) KeySize() int64 {
-	return int64(this.PrimaryHeader.KeySize)
+	return int64(this.Header.KeySize)
 }
 
 // Get the stream offset of the value
@@ -169,23 +152,23 @@ func (this *EntryStreamIteratorResult) EndOffset() int64 {
 
 // Does this entry have a transaction end flag?
 func (this *EntryStreamIteratorResult) HasTransactionEndFlag() bool {
-	return this.PrimaryHeader.Flags&Flag_TransactionEnd == Flag_TransactionEnd
+	return this.Header.Flags&Flag_TransactionEnd == Flag_TransactionEnd
 }
 
-// Verify the primary header's checksum
-func (this *EntryStreamIteratorResult) VerifyPrimaryHeaderChecksum() error {
-	return VerifyPrimaryHeaderChecksum(this.PrimaryHeaderBytes)
+// Verify the header's checksum
+func (this *EntryStreamIteratorResult) VerifyHeaderChecksum() error {
+	return VerifyHeaderChecksum(this.HeaderBytes)
 }
 
 // Verify the payload's checksum
 func (this *EntryStreamIteratorResult) VerifyPayloadChecksum() error {
-	return VerifyPayloadChecksum(this.PrimaryHeaderBytes, this.CreatePayloadReader())
+	return VerifyPayloadChecksum(this.HeaderBytes, this.CreatePayloadReader())
 }
 
 // Verify all checksums
 func (this *EntryStreamIteratorResult) VerifyAllChecksums() (err error) {
-	// Verify primary header checksum
-	err = this.VerifyPrimaryHeaderChecksum()
+	// Verify header checksum
+	err = this.VerifyHeaderChecksum()
 	if err != nil {
 		return err
 	}
@@ -201,7 +184,7 @@ func (this *EntryStreamIteratorResult) VerifyAllChecksums() (err error) {
 
 // Is this supposed to be a head entry?
 func (this *EntryStreamIteratorResult) IsHeadEntry() bool {
-	return this.PrimaryHeader.Flags & Flag_HeadEntry == Flag_HeadEntry
+	return this.Header.Flags & Flag_HeadEntry == Flag_HeadEntry
 }
 
 // Verify as valid head entry
@@ -218,10 +201,10 @@ func (this *EntryStreamIteratorResult) VerifyValidHeadEntry() error {
 
 // Get update time
 func (this *EntryStreamIteratorResult) UpdateTime() int64 {
-	return this.PrimaryHeader.UpdateTime
+	return this.Header.UpdateTime
 }
 
 // Get commit time
 func (this *EntryStreamIteratorResult) CommitTime() int64 {
-	return this.PrimaryHeader.CommitTime
+	return this.Header.CommitTime
 }

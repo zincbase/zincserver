@@ -39,7 +39,7 @@ func (this *ServerDatastoreHandlerSimulator) Get(updatedAfter int64) ([]Entry, e
 	}
 
 	for i := 0; i < len(this.entries); i++ {
-		if this.entries[i].PrimaryHeader.CommitTime > updatedAfter {
+		if this.entries[i].Header.CommitTime > updatedAfter {
 			return this.entries[i:], nil
 		}
 	}
@@ -74,8 +74,8 @@ func (this *ServerDatastoreHandlerSimulator) GetRandomTimestampInCommittedRange(
 		return 0
 	}
 
-	minTimestamp := this.entries[0].PrimaryHeader.CommitTime
-	maxTimestamp := this.entries[len(this.entries)-1].PrimaryHeader.CommitTime
+	minTimestamp := this.entries[0].Header.CommitTime
+	maxTimestamp := this.entries[len(this.entries)-1].Header.CommitTime
 	return RandomInt63InRange(minTimestamp-1, maxTimestamp+1)
 }
 

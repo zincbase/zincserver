@@ -10,13 +10,13 @@ package main
 ////////////////////////////////////////////////////////////////////////////////
 // Serialization
 ////////////////////////////////////////////////////////////////////////////////
-func SerializePrimaryHeader(targetSlice []byte, header *EntryPrimaryHeader) {
-	SerializePrimaryHeader_Slow(targetSlice, header)
+func SerializeHeader(header *EntryHeader, targetSlice []byte) {
+	SerializeHeader_Slow(header, targetSlice)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Deserialization
 ////////////////////////////////////////////////////////////////////////////////
-func DeserializePrimaryHeader(primaryHeaderBytes []byte) *EntryPrimaryHeader {
-	return DeserializePrimaryHeader_Slow(primaryHeaderBytes)
+func DeserializeHeader(headerBytes []byte) *EntryHeader {
+	return DeserializeHeader_Slow(headerBytes)
 }
